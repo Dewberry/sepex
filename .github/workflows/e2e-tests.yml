@@ -50,6 +50,12 @@ jobs:
 
           echo BATCH_LOG_STREAM_GROUP='/aws/batch/job' >> .env
 
+          echo PYWRITE_MINIO_ACCESS_KEY_ID='user' >> .env
+          echo PYWRITE_MINIO_SECRET_ACCESS_KEY='password' >> .env
+          echo PYWRITE_MINIO_S3_ENDPOINT='http://minio:9000' >> .env
+          echo PYWRITE_MINIO_S3_REGION='us-east-1' >> .env
+          echo PYWRITE_MINIO_S3_BUCKET='sepex-storage' >> .env
+
       - name: Build the test images
         run: |
           cd plugin-examples
@@ -99,10 +105,10 @@ jobs:
           docker run --network="host" -v /home/runner/work/sepex/sepex/tests/e2e:/etc/newman/ postman/newman:5.3.1-alpine run tests.postman_collection.json
           --env-var "url=localhost:80" --reporters cli --bail --color on
 
-      # # Uncomment to print logs for debugging
-      # - name: Display docker compose logs
-      #   run: |
-      #     docker compose logs
-      #     cat .data/api/logs/api.jsonl
-      #   if: always()
+      # Uncomment to print logs for debugging
+      - name: Display docker compose logs
+        run: |
+          docker compose logs
+          cat .data/api/logs/api.jsonl
+        if: always()
 
