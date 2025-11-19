@@ -20,7 +20,7 @@ jobs:
 
           echo API_NAME='github-testing-sepex' >> .env
           echo STORAGE_SERVICE='minio' >> .env
-          echo STORAGE_BUCKET='api-storage' >> .env
+          echo STORAGE_BUCKET='sepex-storage' >> .env
           echo STORAGE_METADATA_PREFIX='metadata' >> .env
           echo STORAGE_RESULTS_PREFIX='results' >> .env
           echo STORAGE_LOGS_PREFIX='logs' >> .env
@@ -71,7 +71,7 @@ jobs:
           --network process_api_net
           -e MINIO_ROOT_USER=user
           -e MINIO_ROOT_PASSWORD=password
-          -e STORAGE_BUCKET=api-storage
+          -e STORAGE_BUCKET=sepex-storage
           --entrypoint /bin/sh
           minio/mc:RELEASE.2023-08-18T21-57-55Z
           -c "mc alias set myminio http://minio:9000 \$MINIO_ROOT_USER \$MINIO_ROOT_PASSWORD && mc mb myminio/\${STORAGE_BUCKET}"
