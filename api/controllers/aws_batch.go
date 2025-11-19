@@ -69,13 +69,22 @@ func getResourceRequirement(resourceRequirements []*batch.ResourceRequirement, n
 }
 
 func NewAWSBatchController(accessKey, secretAccessKey, region string) (*AWSBatchController, error) {
-	sess, err := session.NewSession(&aws.Config{
+	cfg := &aws.Config{
 		Credentials: credentials.NewStaticCredentialsFromCreds(credentials.Value{
 			AccessKeyID:     accessKey,
 			SecretAccessKey: secretAccessKey,
 		}),
-		Region: aws.String(region)},
-	)
+	}
+	// Only set Region if a non-empty value was provided. Passing an empty
+	// string to aws.String would result in a non-nil pointer to an empty
+	// string which causes the SDK to return a MissingRegion error. If no
+	// region is provided here we let the AWS SDK resolve the region from
+	// environment variables or shared config files.
+	if region != "" {
+		cfg.Region = aws.String(region)
+	}
+
+	sess, err := session.NewSession(cfg)
 	if err != nil {
 		return nil, err
 	}
