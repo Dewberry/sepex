@@ -74,7 +74,7 @@ func NewAWSBatchController(accessKey, secretAccessKey, region string) (*AWSBatch
 			AccessKeyID:     accessKey,
 			SecretAccessKey: secretAccessKey,
 		}),
-		Region: aws.String("us-east-1")},
+		Region: aws.String(region)},
 	)
 	if err != nil {
 		return nil, err
