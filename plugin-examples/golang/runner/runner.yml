@@ -7,13 +7,15 @@ info:
     - sync-execute
   outputTransmission:
 
-host:
-  type: local
 
-container:
+host:
+  type: docker
   image: lawlerseth/runner:v0.0.1
-  command:
-    - ./main
+
+command:
+  - ./main
+
+config:
   maxResources:
     cpus: 1.0
     memory: 512
@@ -30,7 +32,7 @@ inputs:
     minOccurs: 1
     maxOccurs: 5
   - id: jobRootPrefix
-    title: job's root prefix 
+    title: job's root prefix
     description: root prefix on s3 where model outputs will be written
     input:
       literalDataDomain:

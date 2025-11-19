@@ -18,7 +18,7 @@ jobs:
         run: |
           touch .env
 
-          echo API_NAME='github-testing-process-api' >> .env
+          echo API_NAME='github-testing-sepex' >> .env
           echo STORAGE_SERVICE='minio' >> .env
           echo STORAGE_BUCKET='api-storage' >> .env
           echo STORAGE_METADATA_PREFIX='metadata' >> .env
@@ -56,14 +56,14 @@ jobs:
           chmod +x build.sh
           ./build.sh &
 
-      - name: Build the docker-compose stack
-        run: docker-compose -f docker-compose.prod.yml build
+      - name: Build the docker compose stack
+        run: docker compose -f docker-compose.prod.yml build
 
       - name: Create network
         run: docker network create process_api_net
 
-      - name: Run the docker-compose stack
-        run: docker-compose -f docker-compose.prod.yml up -d
+      - name: Run the docker compose stack
+        run: docker compose -f docker-compose.prod.yml up -d
 
       - name: Create bucket
         run: >
@@ -96,13 +96,13 @@ jobs:
 
       - name: Run newman tests
         run: >
-          docker run --network="host" -v /home/runner/work/process-api/process-api/tests/e2e:/etc/newman/ postman/newman:5.3.1-alpine run tests.postman_collection.json
+          docker run --network="host" -v /home/runner/work/sepex/sepex/tests/e2e:/etc/newman/ postman/newman:5.3.1-alpine run tests.postman_collection.json
           --env-var "url=localhost:80" --reporters cli --bail --color on
 
       # # Uncomment to print logs for debugging
-      # - name: Display docker-compose logs
+      # - name: Display docker compose logs
       #   run: |
-      #     docker-compose logs
+      #     docker compose logs
       #     cat .data/api/logs/api.jsonl
       #   if: always()
 

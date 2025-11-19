@@ -27,6 +27,6 @@
             "@id": "@type"
         },
         "imageDigest": "aorc:hash",
-        "containerCommands": "aorc:commands"
+        "commands": "aorc:commands"
     }
 }

@@ -30,9 +30,10 @@ type Job interface {
 	ProcessVersionID() string
 	SUBMITTER() string
 
-	// UpdateContainerLogs must first fetch the current container logs before writing
-	// UpdateContainerLogs must update logs stored on the disk
-	UpdateContainerLogs() error
+	// UpdateProcessLogs must provide most upto date process logs
+	// for containerized processes, first fetch the current container logs
+	// UpdateProcessLogs must update logs stored on the disk
+	UpdateProcessLogs() error
 	// Kill should successfully send kill signal to the accepted or running container/job
 	// Kill should call Close() in new routine. Error in Close() routine does not effect Kill,
 	// job is already considered dismissed at this point
@@ -55,7 +56,7 @@ type Job interface {
 	WriteMetaData()
 	// WriteResults([]byte) error
 
-	// WaitForRunCompletion must wait until all job is completed.
+	// WaitForRunCompletion must wait until the job is completed.
 	WaitForRunCompletion()
 
 	// Decrement Run Waitgroup
@@ -105,17 +106,17 @@ func DecodeLogStrings(s []string) []LogEntry {
 
 // JobLogs describes logs for the job
 type JobLogs struct {
-	JobID         string     `json:"jobID"`
-	ProcessID     string     `json:"processID"`
-	Status        string     `json:"status"`
-	ContainerLogs []LogEntry `json:"container_logs"`
-	ServerLogs    []LogEntry `json:"server_logs"`
+	JobID       string     `json:"jobID"`
+	ProcessID   string     `json:"processID"`
+	Status      string     `json:"status"`
+	ProcessLogs []LogEntry `json:"process_logs"`
+	ServerLogs  []LogEntry `json:"server_logs"`
 }
 
 // Prettify JobLogs by replacing nil with empty []LogEntry{}
 func (jl *JobLogs) Prettify() {
-	if jl.ContainerLogs == nil {
-		jl.ContainerLogs = []LogEntry{}
+	if jl.ProcessLogs == nil {
+		jl.ProcessLogs = []LogEntry{}
 	}
 	if jl.ServerLogs == nil {
 		jl.ServerLogs = []LogEntry{}
@@ -140,13 +141,13 @@ func FetchResults(svc *s3.S3, jid string) (interface{}, error) {
 		return nil, err
 	}
 
-	containerLogs := logs.ContainerLogs
-	lastLogIdx := len(containerLogs) - 1
+	processLogs := logs.ProcessLogs
+	lastLogIdx := len(processLogs) - 1
 	if lastLogIdx < 0 {
-		return nil, fmt.Errorf("no container logs available")
+		return nil, fmt.Errorf("no process logs available")
 	}
 
-	lastLog := containerLogs[lastLogIdx]
+	lastLog := processLogs[lastLogIdx]
 	lastLogMsg := lastLog.Msg
 	lastLogMsg = strings.ReplaceAll(lastLogMsg, "'", "\"")
 
@@ -220,8 +221,8 @@ func FetchLogs(svc *s3.S3, jid string, onlyContainer bool) (JobLogs, error) {
 		target *[]LogEntry
 	}{
 		{
-			"container",
-			&result.ContainerLogs,
+			"process",
+			&result.ProcessLogs,
 		},
 		{
 			"server",
@@ -271,7 +272,7 @@ func UploadLogsToStorage(svc *s3.S3, jid, pid string) {
 	localDir := os.Getenv("TMP_JOB_LOGS_DIR") // Local directory where logs are stored
 
 	keys := []string{
-		"container",
+		"process",
 		"server",
 	}
 
@@ -295,7 +296,7 @@ func DeleteLocalLogs(svc *s3.S3, jid, pid string) {
 
 	// List of log types
 	keys := []string{
-		"container",
+		"process",
 		"server",
 	}
 

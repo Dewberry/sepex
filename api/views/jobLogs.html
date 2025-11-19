@@ -43,7 +43,7 @@
         </tbody>
     </table>
 
-    <h3>Container Logs</h3>
+    <h3>Process Logs</h3>
     <table>
         <thead>
             <tr>
@@ -53,7 +53,7 @@
             </tr>
         </thead>
         <tbody>
-            {{range .ContainerLogs}}
+            {{range .ProcessLogs}}
             <tr>
                 <td>{{.Time.Format "2006-01-02 15:04:05 MST"}}</td>
                 <td class="log-{{.Level | lower}}">{{.Level | upper}}</td>

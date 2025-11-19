@@ -47,7 +47,7 @@ type AWSBatchJob struct {
 
 	// Job Name in Batch for this job
 	JobName                string `json:"jobName"`
-	EnvVars                map[string]string
+	EnvVars                []string
 	batchContext           *controllers.AWSBatchController
 	logStreamName          string
 	cloudWatchForwardToken string
@@ -88,7 +88,7 @@ func (j *AWSBatchJob) IMAGE() string {
 
 // Update container logs
 // Fetches Container logs from CloudWatch.
-func (j *AWSBatchJob) UpdateContainerLogs() (err error) {
+func (j *AWSBatchJob) UpdateProcessLogs() (err error) {
 
 	j.logger.Debug("Updating container logs by fetching cloud watch logs.")
 	// we are fetching logs here and not in run function because we only want to fetch logs when needed
@@ -102,7 +102,7 @@ func (j *AWSBatchJob) UpdateContainerLogs() (err error) {
 		return
 	}
 
-	file, err := os.OpenFile(fmt.Sprintf("%s/%s.container.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID), os.O_APPEND|os.O_WRONLY, 0666)
+	file, err := os.OpenFile(fmt.Sprintf("%s/%s.process.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID), os.O_APPEND|os.O_WRONLY, 0666)
 	if err != nil {
 		return
 	}
@@ -187,7 +187,7 @@ func (j *AWSBatchJob) Equals(job Job) bool {
 
 func (j *AWSBatchJob) initLogger() error {
 	// Create a place holder file for container logs
-	file, err := os.Create(fmt.Sprintf("%s/%s.container.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
+	file, err := os.Create(fmt.Sprintf("%s/%s.process.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %s", err.Error())
 	}
@@ -231,7 +231,15 @@ func (j *AWSBatchJob) Create() error {
 		return err
 	}
 
-	aWSBatchID, err := batchContext.JobCreate(j.ctx, j.JobDef, j.JobName, j.JobQueue, j.Cmd, j.EnvVars)
+	// get environment variables
+	envs := make(map[string]string, len(j.EnvVars))
+	for _, k := range j.EnvVars {
+		name := strings.TrimPrefix(k, strings.ToUpper(j.ProcessName)+"_")
+		envs[name] = os.Getenv(k)
+	}
+	j.logger.Debugf("Registered %v env vars", len(envs))
+
+	aWSBatchID, err := batchContext.JobCreate(j.ctx, j.JobDef, j.JobName, j.JobQueue, j.Cmd, envs)
 	if err != nil {
 		j.ctxCancel()
 		return err
@@ -349,7 +357,7 @@ func (j *AWSBatchJob) fetchCloudWatchLogs() ([]string, error) {
 				j.cloudWatchForwardToken = ""
 				logs = make([]string, 0)
 				// overwrite file
-				file, err := os.Create(fmt.Sprintf("%s/%s.container.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
+				file, err := os.Create(fmt.Sprintf("%s/%s.process.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
 				if err != nil {
 					return nil, fmt.Errorf("failed to open log file: %s", err.Error())
 				}
@@ -423,7 +431,7 @@ func (j *AWSBatchJob) WriteMetaData() {
 	}
 
 	md := metaData{
-		Context:         "https://github.com/Dewberry/process-api/blob/main/context.jsonld",
+		Context:         "https://github.com/Dewberry/sepex/blob/main/context.jsonld",
 		JobID:           j.UUID,
 		Process:         p,
 		Image:           i,
@@ -475,7 +483,7 @@ func (j *AWSBatchJob) Close() {
 		// Hence this duration can't be too high
 		time.Sleep(time.Duration(i) * 5 * time.Second)
 
-		if err := j.UpdateContainerLogs(); err != nil {
+		if err := j.UpdateProcessLogs(); err != nil {
 			j.logger.Errorf("Trial %d: Could not update container logs. Error: %s", i, err.Error())
 		} else {
 			break // exit the loop if UpdateContainerLogs() is successful

@@ -29,12 +29,12 @@ type metaData struct {
 	JobID   string `json:"apiJobId"`
 	// User    string  `json:"apiUser"`
 	Process process `json:"process"`
-	Image   image   `json:"image"`
+	Image   image   `json:"image,omitempty"`
 	// ComputeEnvironmentURI    string    // ARN
 	// ComputeEnvironmentDigest string    // required for reproducibility, will need to be custom implemented
-	Commands        []string  `json:"containerCommands"`
-	GeneratedAtTime time.Time `json:"generatedAtTime"`
-	StartedAtTime   time.Time `json:"startedAtTime"`
+	Commands        []string  `json:"commands"`
+	GeneratedAtTime time.Time `json:"generatedAtTime"` // not implemented
+	StartedAtTime   time.Time `json:"startedAtTime"`   // not implemented
 	EndedAtTime     time.Time `json:"endedAtTime"`
 }
 

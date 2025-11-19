@@ -11,10 +11,8 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
-	volumetypes "github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/labstack/gommon/log"
 )
@@ -55,31 +53,22 @@ func NewDockerController() (*DockerController, error) {
 }
 
 // returns container id, error
-func (c *DockerController) ContainerRun(ctx context.Context, image string, command []string, volumes []VolumeMount, envVars map[string]string, resources DockerResources) (string, error) {
+func (c *DockerController) ContainerRun(ctx context.Context, image string, command []string, volumes []string, envVars []string, resources DockerResources) (string, error) {
 	hostConfig := container.HostConfig{
 		Resources: container.Resources(resources),
 	}
 
-	//	hostConfig.Mounts = make([]mount.Mount,0);
-
 	mounts := make([]mount.Mount, len(volumes))
-
-	for i, volume := range volumes {
+	for i, volumeSpec := range volumes {
+		parts := strings.Split(volumeSpec, ":") // this has been already validated
 		mount := mount.Mount{
-			Type:   mount.TypeVolume,
-			Source: volume.Volume.Name,
-			Target: volume.HostPath,
+			Type:   mount.TypeBind,
+			Source: parts[0],
+			Target: parts[1],
 		}
 		mounts[i] = mount
 	}
-
 	hostConfig.Mounts = mounts
-	envs := make([]string, len(envVars))
-	var i int
-	for k, v := range envVars {
-		envs[i] = k + "=" + v
-		i++
-	}
 
 	err := createDockerNetwork(c.cli, ctx, DOCKER_NETWORK)
 	if err != nil {
@@ -98,7 +87,7 @@ func (c *DockerController) ContainerRun(ctx context.Context, image string, comma
 		Tty:   true,
 		Image: image,
 		Cmd:   command,
-		Env:   envs,
+		Env:   envVars,
 	}, &hostConfig, netConfig, nil, "")
 	// log.Info("Container Create response", resp)
 	if err != nil {
@@ -198,63 +187,6 @@ func (c *DockerController) EnsureImage(ctx context.Context, image string, verbos
 	}
 
 	_, err = io.Copy(writer, reader)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-type VolumeMount struct {
-	HostPath string
-	Volume   *volumetypes.Volume
-}
-
-func (c *DockerController) FindVolume(name string) (*volumetypes.Volume, error) {
-	volumes, err := c.cli.VolumeList(context.Background(), filters.NewArgs())
-	if err != nil {
-		return nil, err
-	}
-
-	for _, v := range volumes.Volumes {
-		if v.Name == name {
-			return v, nil
-		}
-	}
-	return nil, nil
-}
-
-func (c *DockerController) EnsureVolume(name string) (*volumetypes.Volume, error) {
-	volume, err := c.FindVolume(name)
-	if err != nil {
-		return nil, err
-	}
-
-	if volume != nil {
-		return volume, nil
-	}
-
-	vol, err := c.cli.VolumeCreate(context.Background(), volumetypes.CreateOptions{
-		Driver: "local",
-		//		DriverOpts: map[string]string{},
-		//		Labels:     map[string]string{},
-		Name: name,
-	})
-
-	return &vol, err
-}
-
-func (c *DockerController) RemoveVolume(name string) error {
-	vol, err := c.FindVolume(name)
-	if err != nil {
-		return err
-	}
-
-	if vol == nil {
-		return nil
-	}
-
-	err = c.cli.VolumeRemove(context.Background(), name, true)
 	if err != nil {
 		return err
 	}

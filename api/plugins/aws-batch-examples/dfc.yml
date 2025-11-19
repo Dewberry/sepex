@@ -13,10 +13,9 @@ host:
   jobDefinition: process-sandbox:2
   jobQueue: micro-test
 
-container:
-  command:
-    - python
-    - dfc.py
+command:
+  - python
+  - dfc.py
 
 inputs:
   - id: crs

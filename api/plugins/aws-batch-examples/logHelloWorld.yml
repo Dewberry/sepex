@@ -1,0 +1,34 @@
+info:
+  version: '0.0.1'
+  id: logHelloWorld
+  title: Log Hello World
+  description: Prints a log every 0.1 second
+  jobControlOptions:
+    - async-execute
+  outputTransmission:
+    - reference
+
+host:
+  type: "aws-batch"
+  jobDefinition: gdal-ogrinfo:5
+  jobQueue: micro-test
+
+command:
+  - "sh"
+  - "-c"
+  - |
+    i=0
+    while [ $i -lt 3000 ]; do
+      current_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+      echo "{\"level\": \"INFO\", \"time\": \"$current_time\", \"msg\": \"hello world $i\"}"
+      i=$((i+1))
+      sleep 0.01
+    done
+    echo "{\"plugin_results\": \"Hello World printed 3000 times\"}"
+
+inputs:
+
+outputs:
+
+
+

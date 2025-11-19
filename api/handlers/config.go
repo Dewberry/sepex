@@ -78,7 +78,7 @@ func NewRESTHander() *RESTHandler {
 	// working with pointers here so as not to copy large templates, yamls, and ActiveJobs
 	config := RESTHandler{
 		Name:        apiName,
-		Title:       "process-api",
+		Title:       "sepex",
 		Description: "ogc process api written in Golang for use with cloud service controllers to manage asynchronous requests",
 		ConformsTo: []string{
 			"http://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/",

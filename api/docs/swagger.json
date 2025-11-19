@@ -5,7 +5,7 @@
     "swagger": "2.0",
     "info": {
         "description": "An OGC compliant process server.",
-        "title": "Process-API Server",
+        "title": "SEPEX Server",
         "contact": {
             "name": "Seth Lawler",
             "email": "slawler@dewberry.com"

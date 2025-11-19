@@ -8,12 +8,14 @@ info:
   outputTransmission:
 
 host:
-  type: local
-
-container:
+  type: docker
   image: runner:latest
-  command:
-    - ./main
+
+command:
+  - ./main
+
+config:
+
   maxResources:
     cpus: 1.0
     memory: 512

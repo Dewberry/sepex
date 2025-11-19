@@ -8,19 +8,20 @@ info:
   outputTransmission:
 
 host:
-  type: local
-
-container:
+  type: docker
   image: pywrite:latest
-  command:
-    - python
-    - main.py
+
+command:
+  - python
+  - main.py
+
+config:
   envVars:
-    - MINIO_S3_REGION
-    - MINIO_ACCESS_KEY_ID
-    - MINIO_SECRET_ACCESS_KEY
-    - MINIO_S3_BUCKET
-    - MINIO_S3_ENDPOINT
+    - PYWRITE_MINIO_S3_REGION
+    - PYWRITE_MINIO_ACCESS_KEY_ID
+    - PYWRITE_MINIO_SECRET_ACCESS_KEY
+    - PYWRITE_MINIO_S3_BUCKET
+    - PYWRITE_MINIO_S3_ENDPOINT
   maxResources:
     cpus: 0.1
     memory: 512

@@ -96,8 +96,7 @@ func prepareResponse(c echo.Context, httpStatus int, renderName string, output i
 // runRequestBody provides the required inputs for containerized processes
 // specs: https://developer.ogc.org/api/processes/index.html#tag/Execute
 type runRequestBody struct {
-	Inputs  map[string]interface{} `json:"inputs"`
-	EnvVars map[string]string      `json:"environmentVariables"`
+	Inputs map[string]interface{} `json:"inputs"`
 }
 
 // LandingPage godoc
@@ -193,11 +192,14 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, errResponse{Message: err.Error()})
 	}
 
-	var cmd []string
-	if p.Container.Command == nil {
-		cmd = []string{string(jsonParams)}
-	} else {
-		cmd = append(p.Container.Command, string(jsonParams))
+	// If `"Inputs": {}` in `/execution` payload. Nothing will be appended to process commands.
+	// This allow running processes that do not have any inputs.
+	var cmd = []string{}
+	if p.Command != nil {
+		cmd = append(cmd, p.Command...)
+	}
+	if string(jsonParams) != "{}" {
+		cmd = append(cmd, string(jsonParams))
 	}
 
 	mode := p.Info.JobControlOptions[0]
@@ -208,7 +210,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 	jobID := uuid.New().String()
 
 	// switch host {
-	// case "local":
+	// case "docker":
 	// 	params.Inputs["resultsCallbackUri"] = fmt.Sprintf("%s/jobs/%s/results_update", os.Getenv("API_URL_LOCAL"), jobID)
 	// default:
 	// 	params.Inputs["resultsCallbackUri"] = fmt.Sprintf("%s/jobs/%s/results_update", os.Getenv("API_URL_PUBLIC"), jobID)
@@ -217,15 +219,16 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 	submitter := c.Request().Header.Get("X-ProcessAPI-User-Email")
 	var j jobs.Job
 	switch host {
-	case "local":
+	case "docker":
 		j = &jobs.DockerJob{
 			UUID:           jobID,
 			ProcessName:    processID,
 			ProcessVersion: p.Info.Version,
-			Image:          p.Container.Image,
+			Image:          p.Host.Image,
 			Submitter:      submitter,
-			EnvVars:        p.Container.EnvVars,
-			Resources:      jobs.Resources(p.Container.Resources),
+			EnvVars:        p.Config.EnvVars,
+			Volumes:        p.Config.Volumes,
+			Resources:      jobs.Resources(p.Config.Resources),
 			Cmd:            cmd,
 			StorageSvc:     rh.StorageSvc,
 			DB:             rh.DB,
@@ -236,12 +239,26 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 		j = &jobs.AWSBatchJob{
 			UUID:           jobID,
 			ProcessName:    processID,
-			Image:          p.Container.Image,
+			Image:          p.Host.Image,
 			Submitter:      submitter,
+			EnvVars:        p.Config.EnvVars,
 			Cmd:            cmd,
 			JobDef:         p.Host.JobDefinition,
 			JobQueue:       p.Host.JobQueue,
 			JobName:        fmt.Sprintf("%s_%s", rh.Name, jobID),
+			ProcessVersion: p.Info.Version,
+			StorageSvc:     rh.StorageSvc,
+			DB:             rh.DB,
+			DoneChan:       rh.MessageQueue.JobDone,
+		}
+
+	case "subprocess":
+		j = &jobs.SubprocessJob{
+			UUID:           jobID,
+			ProcessName:    processID,
+			Submitter:      submitter,
+			EnvVars:        p.Config.EnvVars,
+			Cmd:            cmd,
 			ProcessVersion: p.Info.Version,
 			StorageSvc:     rh.StorageSvc,
 			DB:             rh.DB,
@@ -504,7 +521,7 @@ func (rh *RESTHandler) JobLogsHandler(c echo.Context) (err error) {
 			return prepareResponse(c, http.StatusBadRequest, "error", output)
 		}
 
-		_ = (*job).UpdateContainerLogs()
+		_ = (*job).UpdateProcessLogs()
 	} else if jRcrd, ok, err = rh.DB.GetJob(jobID); ok { // db hit
 		pid = jRcrd.ProcessID
 		status = jRcrd.Status
@@ -678,7 +695,7 @@ func (rh *RESTHandler) JobStatusUpdateHandler(c echo.Context) error {
 
 // func (rh *RESTHandler) JobResultsUpdateHandler(c echo.Context) error {
 
-// 	// setup some kind of token/auth to allow only the container to post to this route
+// 	// setup some kind of token/auth to allow only the trusted clients to post to this route
 
 // 	defer c.Request().Body.Close()
 // 	dataBytes, err := io.ReadAll(c.Request().Body)

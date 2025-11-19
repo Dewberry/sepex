@@ -1,0 +1,65 @@
+info:
+  # version should follow semantic versioning `MAJOR.MINOR.PATCH` for details: https://semver.org/
+  version: '0.0.1'
+  # UUID for this process, it should follow camelCase format
+  id: createRasTerrain
+  # human friendly name of the process
+  title: Create a RAS terrain file
+  # describe what this process does in a line or two
+  description: Create a RAS terrain file
+  # available job control options, must be from [sync-execute, async-execute]
+  jobControlOptions:
+    - async-execute
+  # types of outputs that this process generate, must be from [reference, value, ]
+  outputTransmission:
+    - reference
+
+# host are process execution platforms such as, 'docker' or 'aws-batch' or 'subprocess'
+# fields that are not related to a particular host can be omitted, for example jobDefinition, jobQueue not required for 'local' host
+host:
+  type: "subprocess"
+
+# subprocess commands
+# command binary must be available in Path where application is running
+# file paths must either be absolute or relative to where application is running
+command:
+  - python
+  - plugins/create_ras_terrain/create_ras_terrain.py
+
+config:
+  # max resources this subprocess is anticipated to use
+  # the resource limitation is not yet implemented for `subprocess` host
+  maxResources:
+    # cpus in fraction for example, 0.5 would mean use 0.5 CPUs
+    cpus: 0.1
+    # memory in megabytes
+    memory: 1024
+  # env variable keys that need to be passed to container e.g. CRFEATERASTERRAIN_AWS_ACCESS_KEY_ID etc
+  # they would be passed to the container with prefix CRFEATERASTERRAIN_ removed
+  envVars:
+    - variable1
+    - variable2
+  # not implemented for `subprocess` host
+  # volumes:
+
+# inputs user must provide
+inputs:
+  - id: submodelDirectory
+    title: Submodel directory path where HEC-RAS .gpkg file exist
+    description: Submodel directory path where HEC-RAS .gpkg file exist
+    input:
+      literalDataDomain:
+        dataType: string
+        valueDefinition:
+          anyValue: true
+    minOccurs: 1
+    maxOccurs: 1
+
+
+# outputs user should expect after successful run
+outputs:
+  - id: terrainFile
+    title: Terrain file path
+    output:
+      transmissionMode:
+      - reference

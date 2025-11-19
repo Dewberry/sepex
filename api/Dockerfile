@@ -1,5 +1,5 @@
 # -------------------------------
-FROM golang:1.19.12 AS dev
+FROM golang:1.23.2 AS dev
 
 # RUN go install github.com/swaggo/swag/cmd/swag@v1.8.12
 
@@ -16,7 +16,7 @@ ENTRYPOINT ["CompileDaemon", "--build=go build main.go", "--command=./main"]
 # -------------------------------
 
 # -------------------------------
-FROM debian:12.1-slim as prod
+FROM debian:12.6-slim as prod
 
 # Copy the CA certificates from the dev stage
 COPY --from=dev /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt

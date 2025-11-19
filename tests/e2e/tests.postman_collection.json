@@ -1,9 +1,9 @@
 {
 	"info": {
-		"_postman_id": "e1beec19-4b93-43ce-bb89-7928185c511f",
-		"name": "process-api Testing",
+		"_postman_id": "102d8747-8fb1-44b4-89f8-9a06d1bf6d6d",
+		"name": "sepex Testing",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "26956706"
+		"_exporter_id": "36773789"
 	},
 	"item": [
 		{
@@ -136,14 +136,10 @@
 									"\r",
 									"pm.test(\"job control test\", function () {\r",
 									"    pm.expect(processData[\"info\"][\"jobControlOptions\"][0]).to.eql(\"sync-execute\");\r",
-									"});\r",
-									"\r",
-									"pm.test(\"image test\", function () {\r",
-									"    pm.expect(processData[\"image\"]).to.eql(\"pyecho:latest\");\r",
-									"});\r",
-									""
+									"});"
 								],
-								"type": "text/javascript"
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -200,7 +196,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"info\": {\r\n        \"version\": \"12.5.2023\",\r\n        \"id\": \"dfcTest\",\r\n        \"title\": \"Depth Frequency Curve\",\r\n        \"description\": \"Returns data for depth-frequency curve\",\r\n        \"jobControlOptions\": [\"async-execute\"],\r\n        \"outputTransmission\": [\"value\"]\r\n    },\r\n    \"host\": {\r\n        \"type\": \"aws-batch\",\r\n        \"jobDefinition\": \"process-sandbox:2\",\r\n        \"jobQueue\": \"micro-test\"\r\n    },\r\n    \"container\": {\r\n        \"command\": [\"python\", \"dfc.py\"]\r\n    },\r\n    \"inputs\": [\r\n        {\r\n            \"id\": \"crs\",\r\n            \"title\": \"crs\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 0,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"tile\",\r\n            \"title\": \"tile\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"epoch\",\r\n            \"title\": \"epoch\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"points\",\r\n            \"title\": \"points\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 999999\r\n        }\r\n    ],\r\n    \"outputs\": [\r\n        {\r\n            \"id\": \"dfc\",\r\n            \"title\": \"dfc\",\r\n            \"description\": \"\",\r\n            \"output\": {\r\n                \"transmissionMode\": [\r\n                    \"value\"\r\n                ]\r\n            }\r\n        }\r\n    ]\r\n}",
+							"raw": "{\r\n    \"info\": {\r\n        \"version\": \"12.5.2023\",\r\n        \"id\": \"dfcTest\",\r\n        \"title\": \"Depth Frequency Curve\",\r\n        \"description\": \"Returns data for depth-frequency curve\",\r\n        \"jobControlOptions\": [\"async-execute\"],\r\n        \"outputTransmission\": [\"value\"]\r\n    },\r\n    \"host\": {\r\n        \"type\": \"aws-batch\",\r\n        \"jobDefinition\": \"process-sandbox:2\",\r\n        \"jobQueue\": \"micro-test\"\r\n    },\r\n    \"command\": [\"python\", \"dfc.py\"],\r\n    \"inputs\": [\r\n        {\r\n            \"id\": \"crs\",\r\n            \"title\": \"crs\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 0,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"tile\",\r\n            \"title\": \"tile\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"epoch\",\r\n            \"title\": \"epoch\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"points\",\r\n            \"title\": \"points\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 999999\r\n        }\r\n    ],\r\n    \"outputs\": [\r\n        {\r\n            \"id\": \"dfc\",\r\n            \"title\": \"dfc\",\r\n            \"description\": \"\",\r\n            \"output\": {\r\n                \"transmissionMode\": [\r\n                    \"value\"\r\n                ]\r\n            }\r\n        }\r\n    ]\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -233,7 +229,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"info\": {\r\n        \"version\": \"12.5.2023\",\r\n        \"id\": \"dfcTest\",\r\n        \"title\": \"Depth Frequency Curve\",\r\n        \"description\": \"Returns data for depth-frequency curve\",\r\n        \"jobControlOptions\": [\"async-execute\"],\r\n        \"outputTransmission\": [\"value\"]\r\n    },\r\n    \"host\": {\r\n        \"type\": \"aws-batch\",\r\n        \"jobDefinition\": \"process-sandbox:2\",\r\n        \"jobQueue\": \"micro-test\"\r\n    },\r\n    \"container\": {\r\n        \"command\": [\"python\", \"dfc.py\"]\r\n    },\r\n    \"inputs\": [\r\n        {\r\n            \"id\": \"crs\",\r\n            \"title\": \"crs\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 0,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"tile\",\r\n            \"title\": \"tile\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"epoch\",\r\n            \"title\": \"epoch\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"points\",\r\n            \"title\": \"points\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 999999\r\n        }\r\n    ],\r\n    \"outputs\": [\r\n        {\r\n            \"id\": \"dfc\",\r\n            \"title\": \"dfc\",\r\n            \"description\": \"\",\r\n            \"output\": {\r\n                \"transmissionMode\": [\r\n                    \"value\"\r\n                ]\r\n            }\r\n        }\r\n    ]\r\n}",
+							"raw": "{\r\n    \"info\": {\r\n        \"version\": \"12.5.2023\",\r\n        \"id\": \"dfcTest\",\r\n        \"title\": \"Updated Depth Frequency Curve\",\r\n        \"description\": \"Returns data for depth-frequency curve\",\r\n        \"jobControlOptions\": [\"async-execute\"],\r\n        \"outputTransmission\": [\"value\"]\r\n    },\r\n    \"host\": {\r\n        \"type\": \"aws-batch\",\r\n        \"jobDefinition\": \"process-sandbox:2\",\r\n        \"jobQueue\": \"micro-test\"\r\n    },\r\n    \"command\": [\"python\", \"dfc.py\"],\r\n    \"inputs\": [\r\n        {\r\n            \"id\": \"crs\",\r\n            \"title\": \"crs\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 0,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"tile\",\r\n            \"title\": \"tile\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"epoch\",\r\n            \"title\": \"epoch\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"points\",\r\n            \"title\": \"points\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 999999\r\n        }\r\n    ],\r\n    \"outputs\": [\r\n        {\r\n            \"id\": \"dfc\",\r\n            \"title\": \"dfc\",\r\n            \"description\": \"\",\r\n            \"output\": {\r\n                \"transmissionMode\": [\r\n                    \"value\"\r\n                ]\r\n            }\r\n        }\r\n    ]\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -465,7 +461,7 @@
 					]
 				},
 				{
-					"name": "sync",
+					"name": "sync-docker",
 					"item": [
 						{
 							"name": "Positives",
@@ -788,7 +784,296 @@
 					]
 				},
 				{
-					"name": "async",
+					"name": "sync-subprocess",
+					"item": [
+						{
+							"name": "Positives",
+							"item": [
+								{
+									"name": "job-submit",
+									"item": [
+										{
+											"name": "subprocessEcho",
+											"event": [
+												{
+													"listen": "test",
+													"script": {
+														"exec": [
+															""
+														],
+														"type": "text/javascript",
+														"packages": {}
+													}
+												}
+											],
+											"request": {
+												"method": "POST",
+												"header": [],
+												"body": {
+													"mode": "raw",
+													"raw": "{\n    \"inputs\": {}\n}",
+													"options": {
+														"raw": {
+															"language": "json"
+														}
+													}
+												},
+												"url": {
+													"raw": "{{url}}/processes/:processID/execution",
+													"host": [
+														"{{url}}"
+													],
+													"path": [
+														"processes",
+														":processID",
+														"execution"
+													],
+													"variable": [
+														{
+															"key": "processID",
+															"value": "subprocessEcho"
+														}
+													]
+												}
+											},
+											"response": []
+										}
+									],
+									"event": [
+										{
+											"listen": "prerequest",
+											"script": {
+												"type": "text/javascript",
+												"packages": {},
+												"exec": [
+													""
+												]
+											}
+										},
+										{
+											"listen": "test",
+											"script": {
+												"type": "text/javascript",
+												"packages": {},
+												"exec": [
+													"var resp = pm.response.json()\r",
+													"pm.collectionVariables.set(\"jobID\", resp[\"jobID\"])"
+												]
+											}
+										}
+									]
+								},
+								{
+									"name": "job-details",
+									"item": [
+										{
+											"name": "job-status",
+											"event": [
+												{
+													"listen": "test",
+													"script": {
+														"exec": [
+															"pm.test(\"response should have jobid, status, etc\", function () {\r",
+															"    pm.response.to.not.be.error;\r",
+															"    pm.response.to.have.jsonBody(\"jobID\");\r",
+															"    pm.response.to.have.jsonBody(\"status\");\r",
+															"    pm.response.to.have.jsonBody(\"updated\");\r",
+															"    pm.response.to.have.jsonBody(\"processID\");\r",
+															"});"
+														],
+														"type": "text/javascript",
+														"packages": {}
+													}
+												}
+											],
+											"request": {
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{url}}/jobs/:jobID",
+													"host": [
+														"{{url}}"
+													],
+													"path": [
+														"jobs",
+														":jobID"
+													],
+													"variable": [
+														{
+															"key": "jobID",
+															"value": "{{jobID}}"
+														}
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "job-logs",
+											"request": {
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{url}}/jobs/:jobID/logs",
+													"host": [
+														"{{url}}"
+													],
+													"path": [
+														"jobs",
+														":jobID",
+														"logs"
+													],
+													"variable": [
+														{
+															"key": "jobID",
+															"value": "{{jobID}}"
+														}
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "job-results",
+											"request": {
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{url}}/jobs/:jobID/results",
+													"host": [
+														"{{url}}"
+													],
+													"path": [
+														"jobs",
+														":jobID",
+														"results"
+													],
+													"variable": [
+														{
+															"key": "jobID",
+															"value": "{{jobID}}"
+														}
+													]
+												}
+											},
+											"response": []
+										},
+										{
+											"name": "job-metadata",
+											"request": {
+												"method": "GET",
+												"header": [],
+												"url": {
+													"raw": "{{url}}/jobs/:jobID/metadata",
+													"host": [
+														"{{url}}"
+													],
+													"path": [
+														"jobs",
+														":jobID",
+														"metadata"
+													],
+													"variable": [
+														{
+															"key": "jobID",
+															"value": "{{jobID}}"
+														}
+													]
+												}
+											},
+											"response": []
+										}
+									]
+								}
+							],
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"type": "text/javascript",
+										"packages": {},
+										"exec": [
+											""
+										]
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"packages": {},
+										"exec": [
+											"pm.test('Status code is 200', function(){\r",
+											"    pm.response.to.have.status(200)\r",
+											"});\r",
+											"\r",
+											""
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Negatives",
+							"item": [
+								{
+									"name": "job-dismiss",
+									"request": {
+										"method": "DELETE",
+										"header": [],
+										"url": {
+											"raw": "{{url}}/jobs/:jobID",
+											"host": [
+												"{{url}}"
+											],
+											"path": [
+												"jobs",
+												":jobID"
+											],
+											"variable": [
+												{
+													"key": "jobID",
+													"value": "{{jobID}}"
+												}
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"type": "text/javascript",
+										"packages": {},
+										"exec": [
+											""
+										]
+									}
+								},
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"packages": {},
+										"exec": [
+											"pm.test(\"Status code is equal or greater than 400\", function () {\r",
+											"    pm.expect(pm.response.code).to.be.greaterThan(399)\r",
+											"});\r",
+											"\r",
+											"pm.test(\"response should have message\", function () {\r",
+											"    pm.response.to.have.jsonBody(\"message\");\r",
+											"});"
+										]
+									}
+								}
+							]
+						}
+					]
+				},
+				{
+					"name": "aws-batch",
 					"item": [
 						{
 							"name": "Positives",
@@ -1125,9 +1410,9 @@
 													"listen": "test",
 													"script": {
 														"exec": [
-															"const logs = pm.response.json().container_logs;\r",
+															"const logs = pm.response.json().process_logs;\r",
 															"\r",
-															"pm.test(\"number of container logs\", function () {\r",
+															"pm.test(\"number of process logs\", function () {\r",
 															"    pm.expect(logs.length).to.eql(3001);\r",
 															"});\r",
 															""
@@ -1520,10 +1805,11 @@
 											"const jobsData = pm.response.json().jobs;",
 											"",
 											"pm.test(\"number of jobs in record test\", function () {",
-											"    pm.expect(jobsData.length).to.eql(4);",
+											"    pm.expect(jobsData.length).to.eql(5);",
 											"    });"
 										],
-										"type": "text/javascript"
+										"type": "text/javascript",
+										"packages": {}
 									}
 								}
 							],

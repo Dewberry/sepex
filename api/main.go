@@ -234,7 +234,7 @@ func copyFile(src, dst string) error {
 	return os.WriteFile(dst, input, 0644)
 }
 
-// @title Process-API Server
+// @title SEPEX Server
 // @version dev-8.16.23
 // @description An OGC compliant process server.
 
@@ -344,7 +344,8 @@ func main() {
 	// Shutdown the server
 	// By default, Docker provides a grace period of 10 seconds with the docker stop command.
 
-	// Kill any running docker containers (clean up resources)
+	// Kill any running docker containers/subprocess (clean up resources)
+	// Send dismiss notice to all cloud jobs
 	rh.ActiveJobs.KillAll()
 	log.Info("kill command sent to all active jobs")
 
