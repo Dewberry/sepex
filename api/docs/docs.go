@@ -588,7 +588,7 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "localhost:5050",
 	BasePath:         "/",
 	Schemes:          []string{"http"},
-	Title:            "Process-API Server",
+	Title:            "SEPEX Server",
 	Description:      "An OGC compliant process server.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,

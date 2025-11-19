@@ -18,7 +18,7 @@ jobs:
         run: |
           touch .env
 
-          echo API_NAME='github-testing-process-api' >> .env
+          echo API_NAME='github-testing-sepex' >> .env
           echo STORAGE_SERVICE='minio' >> .env
           echo STORAGE_BUCKET='api-storage' >> .env
           echo STORAGE_METADATA_PREFIX='metadata' >> .env
@@ -96,7 +96,7 @@ jobs:
 
       - name: Run newman tests
         run: >
-          docker run --network="host" -v /home/runner/work/process-api/process-api/tests/e2e:/etc/newman/ postman/newman:5.3.1-alpine run tests/e2e/tests.postman_collection.json
+          docker run --network="host" -v /home/runner/work/sepex/sepex/tests/e2e:/etc/newman/ postman/newman:5.3.1-alpine run tests.postman_collection.json
           --env-var "url=localhost:80" --reporters cli --bail --color on
 
       # # Uncomment to print logs for debugging

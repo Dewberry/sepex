@@ -364,7 +364,7 @@ func (j *DockerJob) WriteMetaData() {
 	}
 
 	md := metaData{
-		Context:         "https://github.com/Dewberry/process-api/blob/main/context.jsonld",
+		Context:         "https://github.com/Dewberry/sepex/blob/main/context.jsonld",
 		JobID:           j.UUID,
 		Process:         p,
 		Image:           i,

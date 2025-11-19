@@ -15,7 +15,7 @@ if os.path.exists(output_md):
 with open(output_md, "a") as md:
     md.write(
         """
-Welcome to the sequence diagrams documentation. This page aims to explain the flow of activities for the process-api system. The source code of all UML Diagrams is located at `imgs/umls/sequence-diagrams`.
+Welcome to the sequence diagrams documentation. This page aims to explain the flow of activities for the sepex system. The source code of all UML Diagrams is located at `imgs/umls/sequence-diagrams`.
 
 https://plantuml.com/ is used to generate PNGs.
 

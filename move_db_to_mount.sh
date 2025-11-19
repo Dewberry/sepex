@@ -2,7 +2,7 @@
 
 # Softwares like Dbeaver and QGIS can't open sqlite db saved in WSL due to special characters in path
 # This script moves .data/db.sqlite file to the provided mounted location and then make a symbolic link to that location
-# Usage ./move_db_to_mount.sh /mnt/c/Users/asiddiqui/.data/process-api
+# Usage ./move_db_to_mount.sh /mnt/c/Users/asiddiqui/.data/sepex
 
 COPY_TO_PATH=$1
 

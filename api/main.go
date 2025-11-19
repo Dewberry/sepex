@@ -234,7 +234,7 @@ func copyFile(src, dst string) error {
 	return os.WriteFile(dst, input, 0644)
 }
 
-// @title Process-API Server
+// @title SEPEX Server
 // @version dev-8.16.23
 // @description An OGC compliant process server.
 

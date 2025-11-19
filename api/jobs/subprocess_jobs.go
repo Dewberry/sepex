@@ -279,7 +279,7 @@ func (j *SubprocessJob) WriteMetaData() {
 
 	p := process{j.ProcessID(), j.ProcessVersionID()}
 	md := metaData{
-		Context:         "https://github.com/Dewberry/process-api/blob/main/context.jsonld",
+		Context:         "https://github.com/Dewberry/sepex/blob/main/context.jsonld",
 		JobID:           j.UUID,
 		Process:         p,
 		Commands:        j.Cmd,
