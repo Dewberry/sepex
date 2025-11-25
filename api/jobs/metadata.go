@@ -146,3 +146,93 @@ func getDkrHubImageDigest(imgURI string, arch string) (string, error) {
 
 	return digest, nil
 }
+
+// getGHCRImageDigest fetches the canonical image digest from GHCR for any tag.
+// If token is empty, it fetches an anonymous token for public repositories.
+// GHCR requires authentication even for public images.
+func getGHCRImageDigest(imgURI, token string) (string, error) {
+	// Split repository and tag
+	parts := strings.Split(imgURI, ":")
+	if len(parts) != 2 {
+		return "", fmt.Errorf("invalid image name: %s", imgURI)
+	}
+	repo := strings.TrimPrefix(parts[0], "ghcr.io/")
+	tag := parts[1]
+
+	// Fetch anonymous token if not provided
+	if token == "" {
+		var err error
+		token, err = fetchGHCRToken(repo)
+		if err != nil {
+			return "", fmt.Errorf("error fetching token: %w", err)
+		}
+	}
+
+	url := fmt.Sprintf("https://ghcr.io/v2/%s/manifests/%s", repo, tag)
+
+	req, err := http.NewRequest("HEAD", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	// Accept headers to cover single-arch and multi-arch, Docker & OCI
+	req.Header.Set("Accept", strings.Join([]string{
+		"application/vnd.oci.image.index.v1+json",
+		"application/vnd.oci.image.manifest.v1+json",
+		"application/vnd.docker.distribution.manifest.v2+json",
+		"application/vnd.docker.distribution.manifest.list.v2+json",
+	}, ","))
+
+	client := http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("request error: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return "", fmt.Errorf("tag %s not found in repo %s", tag, repo)
+	} else if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	// Digest is always in this header
+	digest := resp.Header.Get("Docker-Content-Digest")
+	if digest == "" {
+		return "", fmt.Errorf("digest header missing")
+	}
+
+	return digest, nil
+}
+
+// To do: see if GHCR has rate limits for anonymous token requests
+// fetchGHCRToken fetches a public pull token for GHCR
+func fetchGHCRToken(repo string) (string, error) {
+	url := fmt.Sprintf("https://ghcr.io/token?service=ghcr.io&scope=repository:%s:pull", repo)
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("error fetching token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading token response: %w", err)
+	}
+
+	var data struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(body, &data); err != nil {
+		return "", fmt.Errorf("error parsing token JSON: %w", err)
+	}
+
+	if data.Token == "" {
+		return "", fmt.Errorf("token missing in response")
+	}
+
+	return data.Token, nil
+}
+

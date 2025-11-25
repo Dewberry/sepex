@@ -10,7 +10,7 @@ info:
 
 host:
   type: "aws-batch"
-  jobDefinition: gdal-ogrinfo:5
+  jobDefinition: gdal-ogrinfo:6
   jobQueue: micro-test
 
 command:
