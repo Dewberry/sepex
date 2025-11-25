@@ -413,6 +413,12 @@ func (j *AWSBatchJob) WriteMetaData() {
 			j.logger.Errorf("Error writing metadata: %s", err.Error())
 			return
 		}
+	} else if strings.Contains(imgURI, "ghcr.io/") || strings.Contains(imgURI, "pkg.dev/") {
+		imgDgst, err = getGHCRImageDigest(imgURI, "")
+		if err != nil {
+			j.logger.Errorf("Error writing metadata: %s", err.Error())
+			return
+		}
 	} else {
 		imgDgst, err = getDkrHubImageDigest(imgURI, "dummy")
 		if err != nil {
