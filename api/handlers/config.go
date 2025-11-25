@@ -79,7 +79,7 @@ func NewRESTHander() *RESTHandler {
 	config := RESTHandler{
 		Name:        apiName,
 		Title:       "sepex",
-		Description: "ogc process api written in Golang for use with cloud service controllers to manage asynchronous requests",
+		Description: "SEPEX - Service for Encapsulated Processes Execution. An OGC API - Processes compliant server for executing processes locally or on cloud at scale.",
 		ConformsTo: []string{
 			"http://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/",
 			"http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/ogc-process-description",
