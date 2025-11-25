@@ -102,7 +102,7 @@ func NewRESTHander() *RESTHandler {
 
 	db, err := jobs.NewDatabase(dbType)
 	if err != nil {
-		log.Fatalf(err.Error())
+		log.Fatalf("Failed to create database: %v", err)
 	}
 	config.DB = db
 
@@ -135,7 +135,7 @@ func NewRESTHander() *RESTHandler {
 	}
 	err = os.MkdirAll(localLogsDir, 0755)
 	if err != nil {
-		log.Fatalf(err.Error())
+		log.Fatalf("Failed to create logs directory: %v", err)
 	}
 
 	// Setup Active Jobs that will store all jobs currently in process

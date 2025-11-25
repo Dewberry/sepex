@@ -329,7 +329,7 @@ func (j *AWSBatchJob) fetchCloudWatchLogs() ([]string, error) {
 		Region: aws.String(os.Getenv("AWS_REGION")),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("Error creating session: " + err.Error())
+		return nil, fmt.Errorf("Error creating session: %w", err)
 	}
 
 	svc := cloudwatchlogs.New(sess)

@@ -1,7 +1,7 @@
 # -------------------------------
-FROM golang:1.23.2 AS dev
+FROM golang:1.24.1 AS dev
 
-# RUN go install github.com/swaggo/swag/cmd/swag@v1.8.12
+RUN go install github.com/swaggo/swag/cmd/swag@v1.16.6
 
 # Hot-Reloader
 RUN go install github.com/githubnemo/CompileDaemon@v1.4.0
@@ -9,17 +9,19 @@ RUN go install github.com/githubnemo/CompileDaemon@v1.4.0
 COPY ./ /app
 WORKDIR /app
 
-# RUN swag init
+RUN swag init
 RUN go build main.go
 
 ENTRYPOINT ["CompileDaemon", "--build=go build main.go", "--command=./main"]
 # -------------------------------
 
 # -------------------------------
-FROM debian:12.6-slim as prod
+FROM debian:12.8-slim AS prod
 
-# Copy the CA certificates from the dev stage
-COPY --from=dev /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+# Install CA certificates and other runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
