@@ -404,8 +404,9 @@ func (j *AWSBatchJob) WriteMetaData() {
 		return
 	}
 
-	// imgDgst would be incorrect if tag has been updated in between
-	// if there are multiple architecture available for same image tag
+	// - imgDgst would be incorrect if the tag has been updated in between
+	// - if there are multiple architectures available for the same image tag,
+	// the digest is probably for the manifest
 	var imgDgst string
 	if strings.Contains(imgURI, "amazonaws.com/") {
 		imgDgst, err = getECRImageDigest(imgURI)
@@ -413,7 +414,7 @@ func (j *AWSBatchJob) WriteMetaData() {
 			j.logger.Errorf("Error writing metadata: %s", err.Error())
 			return
 		}
-	} else if strings.Contains(imgURI, "ghcr.io/") || strings.Contains(imgURI, "pkg.dev/") {
+	} else if strings.Contains(imgURI, "ghcr.io/") {
 		imgDgst, err = getGHCRImageDigest(imgURI, "")
 		if err != nil {
 			j.logger.Errorf("Error writing metadata: %s", err.Error())
