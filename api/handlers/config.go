@@ -78,8 +78,8 @@ func NewRESTHander() *RESTHandler {
 	// working with pointers here so as not to copy large templates, yamls, and ActiveJobs
 	config := RESTHandler{
 		Name:        apiName,
-		Title:       "process-api",
-		Description: "ogc process api written in Golang for use with cloud service controllers to manage asynchronous requests",
+		Title:       "sepex",
+		Description: "SEPEX - Service for Encapsulated Processes Execution. An OGC API - Processes compliant server for executing processes locally or on cloud at scale.",
 		ConformsTo: []string{
 			"http://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/",
 			"http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/ogc-process-description",
@@ -102,7 +102,7 @@ func NewRESTHander() *RESTHandler {
 
 	db, err := jobs.NewDatabase(dbType)
 	if err != nil {
-		log.Fatalf(err.Error())
+		log.Fatalf("Failed to create database: %v", err)
 	}
 	config.DB = db
 
@@ -135,7 +135,7 @@ func NewRESTHander() *RESTHandler {
 	}
 	err = os.MkdirAll(localLogsDir, 0755)
 	if err != nil {
-		log.Fatalf(err.Error())
+		log.Fatalf("Failed to create logs directory: %v", err)
 	}
 
 	// Setup Active Jobs that will store all jobs currently in process

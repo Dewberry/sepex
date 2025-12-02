@@ -14,35 +14,34 @@ info:
   outputTransmission:
     - reference
 
-# host are container execution platforms such as, 'local' or 'aws-batch'
+# host are process execution platforms such as, 'docker' or 'aws-batch' or 'subprocess'
 # fields that are not related to a particular host can be omitted, for example jobDefinition, jobQueue not required for 'local' host
 host:
-  type: "aws-batch"
-  jobDefinition: process-sandbox:2
-  jobQueue: micro-test
-
-container:
+  type: "docker"
   # full uri of the image, it should be exactly same as what is needed in docker pull command
-  # image should be empty when image is defined somewhere else, for example in jobDefinition
-  # in that case the, the API will fetch this information at the startup and overwrite image information
-  image: ""
-  # entrypoint for the container
-  command:
-    - python
-    - aep_blocks.py
-  # max resources this container can use
-  # should be left empty for cloud processes where this information is defined in cloud job configuration
-  # in that case the, the API will fetch this information at the startup and overwrite these properties
+  image: "alpine:3.18"
+
+# commands for the container, it only overwrite commands, not entrypoint
+# if an image has entrypoint defined, commands will be appended
+command:
+  - python
+  - aep_blocks.py
+
+config:
+  # max resources the container can use
   maxResources:
     # cpus in fraction for example, 0.5 would mean use 0.5 CPUs
     cpus: 0.1
     # memory in megabytes
     memory: 1024
-  # env variable keys that need to be passed to container, for AWS_ACCESS_KEY_ID etc
-  # should be left empty for cloud processes and defined in jobDefinition
+  # env variable keys that need to be passed to container, for AEPGRID_AWS_ACCESS_KEY_ID etc
+  # they would be passed to the container with prefix AEPGRID_ removed
   envVars:
     - variable1
     - variable2
+  # If source volume does not exist it will be created
+  volumes:
+    - ./data/aepGrid:/data
 
 # inputs user must provide
 inputs:

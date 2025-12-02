@@ -32,12 +32,12 @@ jobs:
     - name: Push changes
       run: |
         git clone https://github.com/${{ github.repository }}.wiki.git
-        mv Sequence-Diagrams.md ./process-api.wiki/
-        cd ./process-api.wiki
+        mv Sequence-Diagrams.md ./sepex.wiki/
+        cd ./sepex.wiki
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add .
         # Reference the commit hash from the main repo in the commit message
         git commit -m "Update Sequence diagrams based on commit ${{ github.sha }}"
-        git remote set-url origin https://x-access-token:${{ github.token }}@github.com/Dewberry/process-api.wiki.git
+        git remote set-url origin https://x-access-token:${{ github.token }}@github.com/Dewberry/sepex.wiki.git
         git push

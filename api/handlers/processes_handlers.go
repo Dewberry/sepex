@@ -171,6 +171,7 @@ func (rh *RESTHandler) AddProcessHandler(c echo.Context) error {
 }
 
 // UpdateProcessHandler updates an existing process configuration
+// Partial Updates are not allowed
 func (rh *RESTHandler) UpdateProcessHandler(c echo.Context) error {
 
 	if rh.Config.AuthLevel > 0 {
@@ -192,7 +193,7 @@ func (rh *RESTHandler) UpdateProcessHandler(c echo.Context) error {
 	var updatedProcess processes.Process
 
 	if err := c.Bind(&updatedProcess); err != nil {
-		return c.JSON(http.StatusBadRequest, errResponse{Message: "Invalid process data"})
+		return c.JSON(http.StatusBadRequest, errResponse{Message: "Invalid process data, partial updates are not allowed"})
 	}
 
 	if processID != updatedProcess.Info.ID {

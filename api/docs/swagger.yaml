@@ -183,7 +183,7 @@ info:
     email: slawler@dewberry.com
     name: Seth Lawler
   description: An OGC compliant process server.
-  title: Process-API Server
+  title: SEPEX Server
   version: dev-8.16.23
 paths:
   /:

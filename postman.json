@@ -1,9 +1,9 @@
 {
 	"info": {
-		"_postman_id": "f2417915-437d-4966-b61a-dd65609dd3e4",
-		"name": "process-api",
+		"_postman_id": "b406764c-f047-4887-81df-f3bba74571d3",
+		"name": "sepex",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "26956706"
+		"_exporter_id": "36773789"
 	},
 	"item": [
 		{
@@ -87,6 +87,46 @@
 							"path": [
 								"processes",
 								"pyecho",
+								"execution"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "subprocessEcho",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"inputs\": {}\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{url}}/processes/subprocessEcho/execution",
+							"host": [
+								"{{url}}"
+							],
+							"path": [
+								"processes",
+								"subprocessEcho",
 								"execution"
 							]
 						}
@@ -638,7 +678,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"info\": {\r\n        \"version\": \"1.0.0\",\r\n        \"id\": \"dfc\",\r\n        \"title\": \"Depth Frequency Curve\",\r\n        \"description\": \"Returns data for depth-frequency curve\",\r\n        \"jobControlOptions\": [\"async-execute\"],\r\n        \"outputTransmission\": [\"value\"]\r\n    },\r\n    \"host\": {\r\n        \"type\": \"aws-batch\",\r\n        \"jobDefinition\": \"process-sandbox:2\",\r\n        \"jobQueue\": \"micro-test\"\r\n    },\r\n    \"container\": {\r\n        \"command\": [\"python\", \"dfc.py\"]\r\n    },\r\n    \"inputs\": [\r\n        {\r\n            \"id\": \"crs\",\r\n            \"title\": \"crs\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 0,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"tile\",\r\n            \"title\": \"tile\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"epoch\",\r\n            \"title\": \"epoch\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"points\",\r\n            \"title\": \"points\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 999999\r\n        }\r\n    ],\r\n    \"outputs\": [\r\n        {\r\n            \"id\": \"dfc\",\r\n            \"title\": \"dfc\",\r\n            \"description\": \"\",\r\n            \"output\": {\r\n                \"transmissionMode\": [\r\n                    \"value\"\r\n                ]\r\n            }\r\n        }\r\n    ]\r\n}",
+					"raw": "{\r\n    \"info\": {\r\n        \"version\": \"1.0.0\",\r\n        \"id\": \"dfc\",\r\n        \"title\": \"Depth Frequency Curve\",\r\n        \"description\": \"Returns data for depth-frequency curve\",\r\n        \"jobControlOptions\": [\"async-execute\"],\r\n        \"outputTransmission\": [\"value\"]\r\n    },\r\n    \"host\": {\r\n        \"type\": \"aws-batch\",\r\n        \"jobDefinition\": \"process-sandbox:2\",\r\n        \"jobQueue\": \"micro-test\"\r\n    },\r\n    \"command\": [\"python\", \"dfc.py\"],\r\n    \"inputs\": [\r\n        {\r\n            \"id\": \"crs\",\r\n            \"title\": \"crs\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 0,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"tile\",\r\n            \"title\": \"tile\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"epoch\",\r\n            \"title\": \"epoch\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"points\",\r\n            \"title\": \"points\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 999999\r\n        }\r\n    ],\r\n    \"outputs\": [\r\n        {\r\n            \"id\": \"dfc\",\r\n            \"title\": \"dfc\",\r\n            \"description\": \"\",\r\n            \"output\": {\r\n                \"transmissionMode\": [\r\n                    \"value\"\r\n                ]\r\n            }\r\n        }\r\n    ]\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -671,7 +711,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"info\": {\r\n        \"version\": \"1.0.0\",\r\n        \"id\": \"dfc\",\r\n        \"title\": \"Depth Frequency Curve\",\r\n        \"description\": \"Returns data for depth-frequency curve\",\r\n        \"jobControlOptions\": [\"async-execute\"],\r\n        \"outputTransmission\": [\"value\"]\r\n    },\r\n    \"host\": {\r\n        \"type\": \"aws-batch\",\r\n        \"jobDefinition\": \"process-sandbox:2\",\r\n        \"jobQueue\": \"micro-test\"\r\n    },\r\n    \"container\": {\r\n        \"command\": [\"python\", \"dfc.py\"]\r\n    },\r\n    \"inputs\": [\r\n        {\r\n            \"id\": \"crs\",\r\n            \"title\": \"crs\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 0,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"tile\",\r\n            \"title\": \"tile\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"epoch\",\r\n            \"title\": \"epoch\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"points\",\r\n            \"title\": \"points\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 999999\r\n        }\r\n    ],\r\n    \"outputs\": [\r\n        {\r\n            \"id\": \"dfc\",\r\n            \"title\": \"dfc\",\r\n            \"description\": \"\",\r\n            \"output\": {\r\n                \"transmissionMode\": [\r\n                    \"value\"\r\n                ]\r\n            }\r\n        }\r\n    ]\r\n}",
+					"raw": "{\r\n    \"info\": {\r\n        \"version\": \"1.0.0\",\r\n        \"id\": \"dfc\",\r\n        \"title\": \"Updated Depth Frequency Curve\",\r\n        \"description\": \"Returns data for depth-frequency curve\",\r\n        \"jobControlOptions\": [\"async-execute\"],\r\n        \"outputTransmission\": [\"value\"]\r\n    },\r\n    \"host\": {\r\n        \"type\": \"aws-batch\",\r\n        \"jobDefinition\": \"process-sandbox:2\",\r\n        \"jobQueue\": \"micro-test\"\r\n    },\r\n    \"command\": [\"python\", \"dfc.py\"],\r\n    \"inputs\": [\r\n        {\r\n            \"id\": \"crs\",\r\n            \"title\": \"crs\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 0,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"tile\",\r\n            \"title\": \"tile\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"epoch\",\r\n            \"title\": \"epoch\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"points\",\r\n            \"title\": \"points\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 999999\r\n        }\r\n    ],\r\n    \"outputs\": [\r\n        {\r\n            \"id\": \"dfc\",\r\n            \"title\": \"dfc\",\r\n            \"description\": \"\",\r\n            \"output\": {\r\n                \"transmissionMode\": [\r\n                    \"value\"\r\n                ]\r\n            }\r\n        }\r\n    ]\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"

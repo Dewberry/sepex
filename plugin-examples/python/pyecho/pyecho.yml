@@ -8,13 +8,14 @@ info:
   outputTransmission:
 
 host:
-  type: local
-
-container:
+  type: docker
   image: lawlerseth/pyecho:v0.0.1
-  command:
-    - python
-    - main.py
+
+command:
+  - python
+  - main.py
+
+config:
   maxResources:
     cpus: 0.1
     memory: 256

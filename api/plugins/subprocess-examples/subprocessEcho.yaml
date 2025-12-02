@@ -1,0 +1,24 @@
+info:
+  version: '0.0.1'
+  id: subprocessEcho
+  title: Echo Hello World
+  description: This process runs a simple command-line task i.e. echo Hello World.
+  jobControlOptions:
+    - sync-execute
+  outputTransmission:
+    - reference
+
+host:
+  type: subprocess
+
+command:
+  - echo
+  - '{"plugin_results": "Hello World!"}'
+
+outputs:
+  - id: output1
+    title: Output 1
+    inputId: outputDestination
+    output:
+      transmissionMode:
+        - reference

@@ -1,0 +1,64 @@
+info:
+  # version should follow semantic versioning `MAJOR.MINOR.PATCH` for details: https://semver.org/
+  version: '0.0.1'
+  # UUID for this process, it should follow camelCase format
+  id: aepGrid
+  # human friendly name of the process
+  title: AEP Grid
+  # describe what this process does in a line or two
+  description: Creates an Annual Exceedance Probability (AEP) grid
+  # available job control options, must be from [sync-execute, async-execute]
+  jobControlOptions:
+    - async-execute
+  # types of outputs that this process generate, must be from [reference, value, ]
+  outputTransmission:
+    - reference
+
+# host are process execution platforms such as, 'docker' or 'aws-batch' or 'subprocess'
+# fields that are not related to a particular host can be omitted
+host:
+  type: "aws-batch"
+  jobDefinition: process-sandbox:2
+  jobQueue: micro-test
+  # full uri of the image, it should be exactly same as what is needed in docker pull command
+  # image should be empty when image is defined somewhere else, for example in jobDefinition
+  # in that case the, the API will fetch this information at the startup and overwrite image information
+  image: ""
+
+# commands for the container, it only overwrite commands, not entrypoint
+# if an image has entrypoint defined, commands will be appended
+command:
+  - python
+  - aep_blocks.py
+
+config:
+  # max resources the container can use
+  # not implemented for `aws-batch` job, should be defined in Batch job definition
+  # maxResources:
+  # env variable keys that need to be passed to container, e.g. AEPGRID_AWS_ACCESS_KEY_ID etc
+  # could be defined here or in Batch job definition or both
+  # they would be passed to the container with prefix AEPGRID_ removed
+  envVars:
+  # not implemented for `aws-batch` job, should be defined in Batch job definition
+  # volumes:
+
+# inputs user must provide
+inputs:
+  - id: tile
+    title: tile
+    input:
+      literalDataDomain:
+        dataType: string
+        valueDefinition:
+          anyValue: true
+    minOccurs: 1
+    maxOccurs: 1
+
+# outputs user should expect after successful run
+outputs:
+  - id: aepGrid
+    title: aepGrid
+    inputId: aepGridDestination
+    output:
+      transmissionMode:
+      - reference

@@ -8,6 +8,10 @@
     - Environment variable
     - Default value, where available
 
+## Process Sepcific Env
+- They must start with ALL CAPS process id.
+- They will be passed to jobs with porcess id prefix removed. This allow setting 3rd party env variables such as GDAL_NUM_CPUS etc.
+- We are parsing at the job level so as to allow dynamic updates withouth having to restart server
 
 ## Auth
 - If auth is enabled some or all routes are protected based on env variable `AUTH_LEVEL` settings.
@@ -20,6 +24,8 @@
 - Requests from Admin Role are allowed to retrieve all jobs information, non admins can only retrieve information for jobs that they submitted.
 - Only admins can add/update/delete processes.
 
+## Inputs
+- If `"Inputs": {}` in `/execution` payload. Nothing will be appended to process commands. This allow running processes that do not have any inputs.
 
 ## Scope
 - The behavior of logging is unknown for AWS Batch processes with job definitions having number of attempts more than 1.

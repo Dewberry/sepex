@@ -8,13 +8,14 @@ info:
   outputTransmission:
 
 host:
-  type: local
-
-container:
+  type: docker
   image: lawlerseth/pywrite:v0.0.1
-  command:
-    - python
-    - main.py
+
+command:
+  - python
+  - main.py
+
+config:
   envVars:
     - MINIO_S3_REGION
     - MINIO_ACCESS_KEY_ID

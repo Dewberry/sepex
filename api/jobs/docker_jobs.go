@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,6 +31,7 @@ type DockerJob struct {
 	ProcessVersion string `json:"processVersion"`
 	Submitter      string
 	EnvVars        []string
+	Volumes        []string `json:"volumes"`
 	Cmd            []string `json:"commandOverride"`
 	UpdateTime     time.Time
 	Status         string `json:"status"`
@@ -72,7 +74,7 @@ func (j *DockerJob) IMAGE() string {
 }
 
 // Update container logs
-func (j *DockerJob) UpdateContainerLogs() (err error) {
+func (j *DockerJob) UpdateProcessLogs() (err error) {
 	// If old status is one of the terminated status, close has already been called and container logs fetched, container killed
 	switch j.Status {
 	case SUCCESSFUL, DISMISSED, FAILED:
@@ -91,7 +93,7 @@ func (j *DockerJob) UpdateContainerLogs() (err error) {
 	}
 
 	// Create a new file or overwrite if it exists
-	file, err := os.Create(fmt.Sprintf("%s/%s.container.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
+	file, err := os.Create(fmt.Sprintf("%s/%s.process.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
 	if err != nil {
 		return
 	}
@@ -173,7 +175,7 @@ func (j *DockerJob) Equals(job Job) bool {
 
 func (j *DockerJob) initLogger() error {
 	// Create a place holder file for container logs
-	file, err := os.Create(fmt.Sprintf("%s/%s.container.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
+	file, err := os.Create(fmt.Sprintf("%s/%s.process.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %s", err.Error())
 	}
@@ -253,17 +255,26 @@ func (j *DockerJob) Run() {
 		return
 	}
 
-	// get environment variables
-	envVars := map[string]string{}
-	for _, eVar := range j.EnvVars {
-		envVars[eVar] = os.Getenv(eVar)
+	err = c.EnsureImage(j.ctx, j.Image, false)
+	if err != nil {
+		j.logger.Infof("Could not ensure image %s available", j.Image)
+		j.NewStatusUpdate(FAILED, time.Time{})
+		return
 	}
 
-	j.logger.Infof("Registered %v env vars", len(envVars))
+	// get environment variables
+	envs := make([]string, len(j.EnvVars))
+	for i, k := range j.EnvVars {
+		name := strings.TrimPrefix(k, strings.ToUpper(j.ProcessName)+"_")
+		envs[i] = name + "=" + os.Getenv(k)
+	}
+	j.logger.Debugf("Registered %v env vars", len(envs))
+
 	resources := controllers.DockerResources{}
 	resources.NanoCPUs = int64(j.Resources.CPUs * 1e9)         // Docker controller needs cpu in nano ints
 	resources.Memory = int64(j.Resources.Memory * 1024 * 1024) // Docker controller needs memory in bytes
 
+	// although we have already checked if image is available at the time of process init, we are doing it again just to be explicit
 	err = c.EnsureImage(j.ctx, j.Image, false)
 	if err != nil {
 		j.logger.Infof("Could not ensure image %s available", j.Image)
@@ -272,7 +283,7 @@ func (j *DockerJob) Run() {
 	}
 
 	// start container
-	containerID, err := c.ContainerRun(j.ctx, j.Image, j.Cmd, []controllers.VolumeMount{}, envVars, resources)
+	containerID, err := c.ContainerRun(j.ctx, j.Image, j.Cmd, j.Volumes, envs, resources)
 	if err != nil {
 		j.logger.Errorf("Failed to run container. Error: %s", err.Error())
 		j.NewStatusUpdate(FAILED, time.Time{})
@@ -289,7 +300,7 @@ func (j *DockerJob) Run() {
 	// wait for process to finish
 	exitCode, err := c.ContainerWait(j.ctx, j.ContainerID)
 	if err != nil {
-
+		// to do: check what would happen if container exited because of dismiss signal and hanlde it similar to subprocess_job
 		j.logger.Errorf("Failed waiting for container to finish. Error: %s", err.Error())
 		j.NewStatusUpdate(FAILED, time.Time{})
 		return
@@ -338,7 +349,7 @@ func (j *DockerJob) WriteMetaData() {
 	}
 
 	p := process{j.ProcessID(), j.ProcessVersionID()}
-	imageDigest, err := c.GetImageDigest(j.IMAGE())
+	imageDigest, err := c.GetImageDigest(j.IMAGE()) // what if image is update between start of job and this call?
 	if err != nil {
 		j.logger.Errorf("Error getting Image Digest: %s", err.Error())
 		return
@@ -353,7 +364,7 @@ func (j *DockerJob) WriteMetaData() {
 	}
 
 	md := metaData{
-		Context:         "https://github.com/Dewberry/process-api/blob/main/context.jsonld",
+		Context:         "https://github.com/Dewberry/sepex/blob/main/context.jsonld",
 		JobID:           j.UUID,
 		Process:         p,
 		Image:           i,
@@ -425,9 +436,9 @@ func (j *DockerJob) Close() {
 				j.logger.Errorf("Could not fetch container logs. Error: %s", err.Error())
 			}
 
-			file, err := os.Create(fmt.Sprintf("%s/%s.container.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
+			file, err := os.Create(fmt.Sprintf("%s/%s.process.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
 			if err != nil {
-				j.logger.Errorf("Could not create container logs file. Error: %s", err.Error())
+				j.logger.Errorf("Could not create process logs file. Error: %s", err.Error())
 				return
 			}
 

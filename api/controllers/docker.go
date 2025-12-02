@@ -9,12 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
-	volumetypes "github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/labstack/gommon/log"
 )
@@ -26,14 +24,14 @@ type DockerController struct {
 }
 
 func createDockerNetwork(cli *client.Client, ctx context.Context, networkName string) error {
-	_, err := cli.NetworkInspect(ctx, networkName, types.NetworkInspectOptions{})
+	_, err := cli.NetworkInspect(ctx, networkName, network.InspectOptions{})
 	if err == nil {
 		// Network already exists
 		return nil
 	}
 
 	// Create the network
-	_, err = cli.NetworkCreate(ctx, networkName, types.NetworkCreate{})
+	_, err = cli.NetworkCreate(ctx, networkName, network.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -55,31 +53,22 @@ func NewDockerController() (*DockerController, error) {
 }
 
 // returns container id, error
-func (c *DockerController) ContainerRun(ctx context.Context, image string, command []string, volumes []VolumeMount, envVars map[string]string, resources DockerResources) (string, error) {
+func (c *DockerController) ContainerRun(ctx context.Context, imageName string, command []string, volumes []string, envVars []string, resources DockerResources) (string, error) {
 	hostConfig := container.HostConfig{
 		Resources: container.Resources(resources),
 	}
 
-	//	hostConfig.Mounts = make([]mount.Mount,0);
-
 	mounts := make([]mount.Mount, len(volumes))
-
-	for i, volume := range volumes {
+	for i, volumeSpec := range volumes {
+		parts := strings.Split(volumeSpec, ":") // this has been already validated
 		mount := mount.Mount{
-			Type:   mount.TypeVolume,
-			Source: volume.Volume.Name,
-			Target: volume.HostPath,
+			Type:   mount.TypeBind,
+			Source: parts[0],
+			Target: parts[1],
 		}
 		mounts[i] = mount
 	}
-
 	hostConfig.Mounts = mounts
-	envs := make([]string, len(envVars))
-	var i int
-	for k, v := range envVars {
-		envs[i] = k + "=" + v
-		i++
-	}
 
 	err := createDockerNetwork(c.cli, ctx, DOCKER_NETWORK)
 	if err != nil {
@@ -96,9 +85,9 @@ func (c *DockerController) ContainerRun(ctx context.Context, image string, comma
 
 	resp, err := c.cli.ContainerCreate(ctx, &container.Config{
 		Tty:   true,
-		Image: image,
+		Image: imageName,
 		Cmd:   command,
-		Env:   envs,
+		Env:   envVars,
 	}, &hostConfig, netConfig, nil, "")
 	// log.Info("Container Create response", resp)
 	if err != nil {
@@ -107,7 +96,7 @@ func (c *DockerController) ContainerRun(ctx context.Context, image string, comma
 	}
 
 	// log.Info("Start Container")
-	err = c.cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{})
+	err = c.cli.ContainerStart(ctx, resp.ID, container.StartOptions{})
 	if err != nil {
 		log.Error(err)
 		return "", err
@@ -123,10 +112,9 @@ func (c *DockerController) Version() string {
 // returns container logs as string, error
 func (c *DockerController) ContainerLog(ctx context.Context, id string) ([]string, error) {
 
-	reader, err := c.cli.ContainerLogs(ctx, id, types.ContainerLogsOptions{
+	reader, err := c.cli.ContainerLogs(ctx, id, container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true})
-
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +145,7 @@ func (c *DockerController) ContainerWait(ctx context.Context, id string) (int64,
 }
 
 func (c *DockerController) ContainerRemove(ctx context.Context, containerID string) error {
-	return c.cli.ContainerRemove(ctx, containerID, types.ContainerRemoveOptions{
+	return c.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{
 		Force: true,
 	})
 }
@@ -169,22 +157,22 @@ func (c *DockerController) ContainerKill(ctx context.Context, containerID string
 }
 
 // https://gist.github.com/miguelmota/4980b18d750fb3b1eb571c3e207b1b92
-func (c *DockerController) EnsureImage(ctx context.Context, image string, verbose bool) error {
-	images, err := c.cli.ImageList(ctx, types.ImageListOptions{})
+func (c *DockerController) EnsureImage(ctx context.Context, imageName string, verbose bool) error {
+	images, err := c.cli.ImageList(ctx, image.ListOptions{})
 	if err != nil {
 		return err
 	}
 
 	for _, img := range images {
 		for _, tag := range img.RepoTags {
-			if strings.EqualFold(tag, image) {
+			if strings.EqualFold(tag, imageName) {
 				// Image already exists, return nil
 				return nil
 			}
 		}
 	}
 
-	reader, err := c.cli.ImagePull(ctx, image, types.ImagePullOptions{})
+	reader, err := c.cli.ImagePull(ctx, imageName, image.PullOptions{})
 	if err != nil {
 		return err
 	}
@@ -198,63 +186,6 @@ func (c *DockerController) EnsureImage(ctx context.Context, image string, verbos
 	}
 
 	_, err = io.Copy(writer, reader)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-type VolumeMount struct {
-	HostPath string
-	Volume   *volumetypes.Volume
-}
-
-func (c *DockerController) FindVolume(name string) (*volumetypes.Volume, error) {
-	volumes, err := c.cli.VolumeList(context.Background(), filters.NewArgs())
-	if err != nil {
-		return nil, err
-	}
-
-	for _, v := range volumes.Volumes {
-		if v.Name == name {
-			return v, nil
-		}
-	}
-	return nil, nil
-}
-
-func (c *DockerController) EnsureVolume(name string) (*volumetypes.Volume, error) {
-	volume, err := c.FindVolume(name)
-	if err != nil {
-		return nil, err
-	}
-
-	if volume != nil {
-		return volume, nil
-	}
-
-	vol, err := c.cli.VolumeCreate(context.Background(), volumetypes.CreateOptions{
-		Driver: "local",
-		//		DriverOpts: map[string]string{},
-		//		Labels:     map[string]string{},
-		Name: name,
-	})
-
-	return &vol, err
-}
-
-func (c *DockerController) RemoveVolume(name string) error {
-	vol, err := c.FindVolume(name)
-	if err != nil {
-		return err
-	}
-
-	if vol == nil {
-		return nil
-	}
-
-	err = c.cli.VolumeRemove(context.Background(), name, true)
 	if err != nil {
 		return err
 	}
