@@ -248,7 +248,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             GIT_TAG=${{ needs.validate-release.outputs.tag_name }}
-            GIT_COMMIT=${{ github.sha }}
 
       - name: Download release notes
         uses: actions/download-artifact@v4

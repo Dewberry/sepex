@@ -1,9 +1,8 @@
 # -------------------------------
 FROM golang:1.24.1 AS dev
 
-# Build arguments for version information (defaults to unknown)
+# GH Actions sets these variables
 ARG GIT_TAG=unknown
-ARG GIT_COMMIT=unknown
 
 RUN go install github.com/swaggo/swag/cmd/swag@v1.16.6
 
@@ -14,7 +13,7 @@ COPY ./ /app
 WORKDIR /app
 
 RUN swag init && \
-    go build -ldflags="-X main.GitTag=${GIT_TAG} -X main.GitCommit=${GIT_COMMIT}" -o main main.go
+    go build -ldflags="-X main.GitTag=${GIT_TAG}" -o main main.go
 
 
 ENTRYPOINT ["CompileDaemon", "--build=go build main.go", "--command=./main"]
