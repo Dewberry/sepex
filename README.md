@@ -1,6 +1,6 @@
 # SEPEX - Service for Encapsulated Processes Execution
 
-[![Container CI](https://github.com/Dewberry/sepex/actions/workflows/container-ci.yml/badge.svg)](https://github.com/Dewberry/sepex/actions/workflows/container-ci.yml)
+[![Container CI](https://github.com/Dewberry/sepex/actions/workflows/release.yml/badge.svg)](https://github.com/Dewberry/sepex/actions/workflows/release.yml)
 [![E2E Tests](https://github.com/Dewberry/sepex/actions/workflows/e2e-tests.yml/badge.svg?event=push)](https://github.com/Dewberry/sepex/actions/workflows/e2e-tests.yml)
 [![Update Sequence Diagrams Wiki](https://github.com/Dewberry/sepex/actions/workflows/update-squence-wiki.yml/badge.svg)](https://github.com/Dewberry/sepex/actions/workflows/update-squence-wiki.yml)
 

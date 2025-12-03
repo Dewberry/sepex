@@ -27,6 +27,11 @@ import (
 )
 
 var (
+	// Build-time version information
+	GitTag    = "unknown" // will be injected at build-time
+)
+
+var (
 	envFP          string
 	pluginsLoadDir string
 	dbPath         string
@@ -254,7 +259,7 @@ func main() {
 	initPlugins()
 
 	// Initialize resources
-	rh := handlers.NewRESTHander()
+	rh := handlers.NewRESTHander(GitTag)
 	// todo: handle this error: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running
 	// todo: all non terminated job statuses should be updated to unknown
 	// todo: all logs in the logs directory should be moved to storage
