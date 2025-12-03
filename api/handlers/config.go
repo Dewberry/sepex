@@ -48,6 +48,8 @@ type RESTHandler struct {
 	Name         string
 	Title        string
 	Description  string
+	GitTag       string
+	RepoURL      string
 	ConformsTo   []string
 	T            Template
 	StorageSvc   *s3.S3
@@ -69,10 +71,15 @@ func prettyPrint(v interface{}) string {
 
 // Initializes resources and return a new handler
 // errors are fatal
-func NewRESTHander() *RESTHandler {
+func NewRESTHander(gitTag string) *RESTHandler {
 	apiName, exist := os.LookupEnv("API_NAME")
 	if !exist {
 		log.Warn("env variable API_NAME not set")
+	}
+
+	repoURL, exist := os.LookupEnv("REPO_URL")
+	if !exist {
+		log.Warn("env variable REPO_URL not set")
 	}
 
 	// working with pointers here so as not to copy large templates, yamls, and ActiveJobs
@@ -80,6 +87,8 @@ func NewRESTHander() *RESTHandler {
 		Name:        apiName,
 		Title:       "sepex",
 		Description: "SEPEX - Service for Encapsulated Processes Execution. An OGC API - Processes compliant server for executing processes locally or on cloud at scale.",
+		GitTag:      gitTag,
+		RepoURL:     repoURL,
 		ConformsTo: []string{
 			"http://schemas.opengis.net/ogcapi/processes/part1/1.0/openapi/schemas/",
 			"http://www.opengis.net/spec/ogcapi-processes-1/1.0/conf/ogc-process-description",
@@ -108,9 +117,16 @@ func NewRESTHander() *RESTHandler {
 
 	// Read all the html templates
 	funcMap := template.FuncMap{
-		"prettyPrint": prettyPrint, // to pretty print JSONs for results and metadata
-		"lower":       strings.ToLower,
-		"upper":       strings.ToUpper,
+		"prettyPrint":   prettyPrint, // to pretty print JSONs for results and metadata
+		"lower":         strings.ToLower,
+		"upper":         strings.ToUpper,
+		"lastSegment": func(s string) string {
+			parts := strings.Split(strings.TrimSuffix(s, "/"), "/")
+			if len(parts) > 0 {
+				return parts[len(parts)-1]
+			}
+			return s
+		},
 	}
 
 	config.T = Template{

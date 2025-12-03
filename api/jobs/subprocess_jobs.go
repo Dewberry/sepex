@@ -278,8 +278,10 @@ func (j *SubprocessJob) WriteMetaData() {
 	defer j.logger.Info("Finished metadata writing routine.")
 
 	p := process{j.ProcessID(), j.ProcessVersionID()}
+	repoURL := os.Getenv("REPO_URL")
+
 	md := metaData{
-		Context:         "https://github.com/Dewberry/sepex/blob/main/context.jsonld",
+		Context:         fmt.Sprintf("%s/blob/main/context.jsonld", repoURL),
 		JobID:           j.UUID,
 		Process:         p,
 		Commands:        j.Cmd,

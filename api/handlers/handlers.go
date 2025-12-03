@@ -113,9 +113,18 @@ func (rh *RESTHandler) LandingPage(c echo.Context) error {
 		return err
 	}
 
-	output := map[string]string{
+	// Construct OGC API - Processes compliant response
+	output := map[string]interface{}{
 		"title":       rh.Title,
 		"description": rh.Description,
+		"links": []link{
+			{
+				Href:  fmt.Sprintf("%s/releases/tag/%s", rh.RepoURL, rh.GitTag),
+				Rel:   "version",
+				Type:  "text/html",
+				Title: "Release Information",
+			},
+		},
 	}
 	return prepareResponse(c, http.StatusOK, "landing", output)
 }

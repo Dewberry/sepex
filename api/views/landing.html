@@ -11,8 +11,15 @@
 
 <body>
     <h1>SEPEX</h1>
-    <p>{{ .description}}
-    </p>
+    <p>{{ .description }}</p>
+
+    <div class="footer-bar">
+        {{range .links}}
+        {{if eq .Rel "version"}}
+        Deployed Version: <a href="{{.Href}}" target="_blank" rel="noopener noreferrer">{{lastSegment .Href}}</a>
+        {{end}}
+        {{end}}
+    </div>
 </body>
 
 </html>

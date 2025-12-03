@@ -198,3 +198,20 @@ code[class*="language-"] {
 .log-info {
     color: var(--log-info);
 }
+
+.footer-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0.5rem 1rem;
+    border-top: 1px solid var(--table-border-color);
+    background-color: var(--background-color);
+    font-size: 0.75rem;
+    color: var(--font-color-gray);
+    text-align: center;
+}
+
+.footer-bar a {
+    font-family: monospace;
+}

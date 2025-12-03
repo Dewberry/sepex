@@ -437,8 +437,10 @@ func (j *AWSBatchJob) WriteMetaData() {
 		return
 	}
 
+	repoURL := os.Getenv("REPO_URL")
+
 	md := metaData{
-		Context:         "https://github.com/Dewberry/sepex/blob/main/context.jsonld",
+		Context:         fmt.Sprintf("%s/blob/main/context.jsonld", repoURL),
 		JobID:           j.UUID,
 		Process:         p,
 		Image:           i,

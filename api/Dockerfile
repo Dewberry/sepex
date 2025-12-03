@@ -1,6 +1,9 @@
 # -------------------------------
 FROM golang:1.24.1 AS dev
 
+# GH Actions sets these variables
+ARG GIT_TAG=unknown
+
 RUN go install github.com/swaggo/swag/cmd/swag@v1.16.6
 
 # Hot-Reloader
@@ -9,8 +12,9 @@ RUN go install github.com/githubnemo/CompileDaemon@v1.4.0
 COPY ./ /app
 WORKDIR /app
 
-RUN swag init
-RUN go build main.go
+RUN swag init && \
+    go build -ldflags="-X main.GitTag=${GIT_TAG}" -o main main.go
+
 
 ENTRYPOINT ["CompileDaemon", "--build=go build main.go", "--command=./main"]
 # -------------------------------
