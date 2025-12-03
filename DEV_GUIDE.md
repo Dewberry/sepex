@@ -8,16 +8,16 @@
     - Environment variable
     - Default value, where available
 
-## Process Sepcific Env
+## Process Specific Env
 - They must start with ALL CAPS process id.
-- They will be passed to jobs with porcess id prefix removed. This allow setting 3rd party env variables such as GDAL_NUM_CPUS etc.
-- We are parsing at the job level so as to allow dynamic updates withouth having to restart server
+- They will be passed to jobs with process id prefix removed. This allow setting 3rd party env variables such as GDAL_NUM_CPUS etc.
+- We are parsing at the job level so as to allow dynamic updates without having to restart server
 
 ## Auth
 - If auth is enabled some or all routes are protected based on env variable `AUTH_LEVEL` settings.
 - The middleware validate and parse JWT to verify `X-ProcessAPI-User-Email` header and inject `X-ProcessAPI-User-Roles` header.
 - A user can use tools like Postman to set these headers themselves, but if auth is enabled, they will be checked against the token. This setup allows adding submitter info to the database when auth is not enabled.
-- I auth is enabled `X-ProcessAPI-User-Email` header is mandatory.
+- If auth is enabled `X-ProcessAPI-User-Email` header is mandatory.
 - Requests from Service Role will not be verified for `X-ProcessAPI-User-Email`.
 - Only service_accounts can post callbacks
 - Requests from Admin Role are allowed to execute all processes, non-admins must have the role with same name as `processID` to execute that process.
@@ -29,3 +29,44 @@
 
 ## Scope
 - The behavior of logging is unknown for AWS Batch processes with job definitions having number of attempts more than 1.
+
+## Release/Versioning/Changelog
+
+The project uses an automated release workflow triggered by semver tags (e.g., `v1.0.0`, `v1.0.0-beta`). The workflow validates prerequisites, runs security scans, builds multi-platform container images, and creates GitHub releases with auto-generated release notes.
+
+### How to Create a Release
+
+1. **Update CHANGELOG.md**
+   - Add a new version entry following the format: `## [X.Y.Z] - YYYY-MM-DD`
+   - Document all changes under appropriate categories (API, Features, Configuration, etc.)
+   - Add version comparison links at the bottom of the file
+   - Release workflow fails if version is missing from CHANGELOG.md
+
+2. **Create and Push a Semver Tag**
+   ```bash
+   # For a regular release
+   git tag v1.0.0
+   git push origin v1.0.0
+
+   # For a prerelease (alpha, beta, rc)
+   git tag v1.0.0-beta
+   git push origin v1.0.0-beta
+   ```
+
+3. **Monitor the Release Workflow**
+   - The GitHub Actions workflow will automatically trigger
+   - It will validate the tag format and CHANGELOG entry
+   - Run CodeQL security scan on the codebase
+   - Build the container image
+   - Run Trivy vulnerability scan on the container
+   - Push multi-platform images to GitHub Container Registry
+   - Create a GitHub release with release notes copied from CHANGELOG.md
+
+4. **Workflow Can Also Be Triggered Manually**
+   - Go to Actions tab → Release workflow → Run workflow
+   - Select the tag from the dropdown
+   - This is useful for re-running a release if needed
+
+
+
+
