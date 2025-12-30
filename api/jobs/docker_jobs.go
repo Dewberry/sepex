@@ -40,9 +40,11 @@ type DockerJob struct {
 	logFile *os.File
 
 	Resources
-	DB         Database
-	StorageSvc *s3.S3
-	DoneChan   chan Job
+	DB           Database
+	StorageSvc   *s3.S3
+	DoneChan     chan Job
+	ResourcePool *ResourcePool
+	IsSync       bool
 }
 
 func (j *DockerJob) WaitForRunCompletion() {
@@ -71,6 +73,10 @@ func (j *DockerJob) CMD() []string {
 
 func (j *DockerJob) IMAGE() string {
 	return j.Image
+}
+
+func (j *DockerJob) GetResources() Resources {
+	return j.Resources
 }
 
 // Update container logs
@@ -202,6 +208,21 @@ func (j *DockerJob) initLogger() error {
 }
 
 func (j *DockerJob) Create() error {
+	// Only reserve resources for sync jobs at creation time
+	// Async jobs will have resources reserved when QueueWorker starts them
+	if j.IsSync {
+		if !j.ResourcePool.TryReserve(j.Resources.CPUs, j.Resources.Memory) {
+			return fmt.Errorf("resources unavailable")
+		}
+	}
+
+	// Track if creation succeeded to handle cleanup on error
+	success := false
+	defer func() {
+		if !success && j.IsSync {
+			j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory)
+		}
+	}()
 
 	err := j.initLogger()
 	if err != nil {
@@ -221,9 +242,17 @@ func (j *DockerJob) Create() error {
 	}
 
 	j.NewStatusUpdate(ACCEPTED, time.Time{})
+
+	// Increment wgRun here so WaitForRunCompletion() blocks
+	// even if QueueWorker hasn't called StartRun() yet
 	j.wgRun.Add(1)
-	go j.Run()
+
+	success = true
 	return nil
+}
+
+func (j *DockerJob) IsSyncJob() bool {
+	return j.IsSync
 }
 
 func (j *DockerJob) Run() {
@@ -467,6 +496,9 @@ func (j *DockerJob) Close() {
 		}
 	}
 	j.DoneChan <- j // At this point job can be safely removed from active jobs
+
+	// Release resources back to the pool
+	j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory)
 
 	go func() {
 		j.wg.Wait() // wait if other routines like metadata are running

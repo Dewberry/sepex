@@ -28,7 +28,7 @@ import (
 
 var (
 	// Build-time version information
-	GitTag    = "unknown" // will be injected at build-time
+	GitTag = "unknown" // will be injected at build-time
 )
 
 var (
@@ -267,6 +267,7 @@ func main() {
 	// Goroutines
 	go rh.StatusUpdateRoutine()
 	go rh.JobCompletionRoutine()
+	rh.QueueWorker.Start() // Start() spawns its own goroutine and supports Stop() for graceful shutdown
 
 	// Set server configuration
 	e := echo.New()
@@ -349,7 +350,14 @@ func main() {
 	// Shutdown the server
 	// By default, Docker provides a grace period of 10 seconds with the docker stop command.
 
-	// Kill any running docker containers/subprocess (clean up resources)
+	// Stop ResourcePool goroutine
+	rh.ResourcePool.Stop()
+
+	// Stop QueueWorker from starting new jobs
+	rh.QueueWorker.Stop()
+
+	// Kill any running docker containers / subprocesses (clean up resources)
+	// Kill all active jobs
 	// Send dismiss notice to all cloud jobs
 	rh.ActiveJobs.KillAll()
 	log.Info("kill command sent to all active jobs")

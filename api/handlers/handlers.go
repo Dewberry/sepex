@@ -242,6 +242,8 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			StorageSvc:     rh.StorageSvc,
 			DB:             rh.DB,
 			DoneChan:       rh.MessageQueue.JobDone,
+			ResourcePool:   rh.ResourcePool,
+			IsSync:         mode == "sync-execute",
 		}
 
 	case "aws-batch":
@@ -269,15 +271,24 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			EnvVars:        p.Config.EnvVars,
 			Cmd:            cmd,
 			ProcessVersion: p.Info.Version,
+			Resources:      jobs.Resources(p.Config.Resources),
 			StorageSvc:     rh.StorageSvc,
 			DB:             rh.DB,
 			DoneChan:       rh.MessageQueue.JobDone,
+			ResourcePool:   rh.ResourcePool,
+			IsSync:         mode == "sync-execute",
 		}
 	}
 
-	// Create job
+	// Create job (reserves resources for sync docker/subprocess jobs)
 	err = j.Create()
 	if err != nil {
+		if err.Error() == "resources unavailable" {
+			// Only sync jobs can fail with this error
+			return c.JSON(http.StatusServiceUnavailable, errResponse{
+				Message: "Server resources temporarily unavailable. Use async-execute mode (if available for this process) or retry later.",
+			})
+		}
 		return c.JSON(http.StatusInternalServerError, errResponse{Message: fmt.Sprintf("submission error %s", err.Error())})
 	}
 
@@ -287,6 +298,8 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 	resp := jobResponse{ProcessID: j.ProcessID(), Type: "process", JobID: jobID, Status: j.CurrentStatus()}
 	switch mode {
 	case "sync-execute":
+		j.Run()
+		// wgRun.Add(1) is called in Create() so WaitForRunCompletion() blocks correctly
 		j.WaitForRunCompletion()
 		resp.Status = j.CurrentStatus()
 

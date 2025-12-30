@@ -56,6 +56,7 @@ type AWSBatchJob struct {
 	DB         Database
 	StorageSvc *s3.S3
 	DoneChan   chan Job
+	Resources  // AWS Batch manages its own resources, but field needed for interface
 }
 
 func (j *AWSBatchJob) WaitForRunCompletion() {
@@ -84,6 +85,23 @@ func (j *AWSBatchJob) CMD() []string {
 
 func (j *AWSBatchJob) IMAGE() string {
 	return j.Image
+}
+
+// Not used anywhere but needed for interface.
+func (j *AWSBatchJob) GetResources() Resources {
+	return j.Resources
+}
+
+// Run is a no-op for AWS Batch jobs since they auto-start in Create()
+func (j *AWSBatchJob) Run() {
+	// AWS Batch jobs are submitted and start running automatically via the batch service
+	// No additional action needed here
+}
+
+// IsSyncJob returns false for AWS Batch jobs.
+// AWS Batch manages its own resources, so from local resource pool perspective, they're always async.
+func (j *AWSBatchJob) IsSyncJob() bool {
+	return false
 }
 
 // Update container logs
