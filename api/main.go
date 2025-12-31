@@ -321,6 +321,9 @@ func main() {
 	pg.PUT("/jobs/:jobID/status", rh.JobStatusUpdateHandler)
 	// e.POST("/jobs/:jobID/results", rh.JobResultsUpdateHandler)
 
+	// Admin
+	e.GET("/admin/resources", rh.ResourceStatusHandler)
+
 	_, lw := initLogger()
 	fmt.Println("Logging to", logFile)
 	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{

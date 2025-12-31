@@ -759,3 +759,61 @@ func (rh *RESTHandler) JobStatusUpdateHandler(c echo.Context) error {
 // 	}
 
 // }
+
+// resourcesResponse provides resource utilization data for JSON API and HTML rendering
+type resourcesResponse struct {
+	UsedCPUs      float32 `json:"usedCPUs"`
+	UsedMemory    int     `json:"usedMemory"`
+	QueuedCPUs    float32 `json:"queuedCPUs"`
+	QueuedMemory  int     `json:"queuedMemory"`
+	MaxCPUs       float32 `json:"maxCPUs"`
+	MaxMemory     int     `json:"maxMemory"`
+	UsedCPUsPct   float32 `json:"usedCPUsPct"`
+	QueuedCPUsPct float32 `json:"queuedCPUsPct"`
+	UsedMemPct    float32 `json:"usedMemPct"`
+	QueuedMemPct  float32 `json:"queuedMemPct"`
+}
+
+// @Summary Resource Status
+// @Description Returns current resource utilization for local job scheduling
+// @Tags admin
+// @Accept */*
+// @Produce json
+// @Success 200 {object} resourceStatusOutput
+// @Router /admin/resources [get]
+func (rh *RESTHandler) ResourceStatusHandler(c echo.Context) error {
+	err := validateFormat(c)
+	if err != nil {
+		return err
+	}
+
+	status := rh.ResourcePool.GetStatus()
+
+	resources := resourcesResponse{
+		UsedCPUs:     status.UsedCPUs,
+		UsedMemory:   status.UsedMemory,
+		QueuedCPUs:   status.QueuedCPUs,
+		QueuedMemory: status.QueuedMemory,
+		MaxCPUs:      status.MaxCPUs,
+		MaxMemory:    status.MaxMemory,
+	}
+
+	if status.MaxCPUs > 0 {
+		resources.UsedCPUsPct = (status.UsedCPUs / status.MaxCPUs) * 100
+		resources.QueuedCPUsPct = (status.QueuedCPUs / status.MaxCPUs) * 100
+	}
+	if status.MaxMemory > 0 {
+		resources.UsedMemPct = (float32(status.UsedMemory) / float32(status.MaxMemory)) * 100
+		resources.QueuedMemPct = (float32(status.QueuedMemory) / float32(status.MaxMemory)) * 100
+	}
+
+	links := []link{
+		{Href: "/admin/resources", Rel: "self", Title: "this document"},
+	}
+
+	output := make(map[string]interface{})
+	output["resources"] = resources
+	output["links"] = links
+
+	return prepareResponse(c, http.StatusOK, "resourceStatus", output)
+}
