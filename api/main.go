@@ -350,9 +350,6 @@ func main() {
 	// Shutdown the server
 	// By default, Docker provides a grace period of 10 seconds with the docker stop command.
 
-	// Stop ResourcePool goroutine
-	rh.ResourcePool.Stop()
-
 	// Stop QueueWorker from starting new jobs
 	rh.QueueWorker.Stop()
 

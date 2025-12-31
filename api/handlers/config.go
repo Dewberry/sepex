@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -29,6 +31,14 @@ func (t Template) Render(w io.Writer, name string, data interface{}, c echo.Cont
 	return t.templates.ExecuteTemplate(w, name, data)
 }
 
+// ResourceLimits holds the maximum resource limits for job scheduling.
+// This is read once at startup and shared across the application to ensure
+// consistent validation between process registration and job execution.
+type ResourceLimits struct {
+	MaxCPUs   float32
+	MaxMemory int // in MB
+}
+
 // Config holds the configuration settings for the REST API server.
 type Config struct {
 	// Only settings that are typically environment-specific and can be loaded from
@@ -39,6 +49,9 @@ type Config struct {
 	AuthLevel       int
 	AdminRoleName   string
 	ServiceRoleName string
+
+	// Resource limits for local job scheduling (docker/subprocess)
+	ResourceLimits *ResourceLimits
 }
 
 // RESTHandler encapsulates the operational components and dependencies necessary for handling
@@ -56,6 +69,9 @@ type RESTHandler struct {
 	DB           jobs.Database
 	MessageQueue *jobs.MessageQueue
 	ActiveJobs   *jobs.ActiveJobs
+	PendingJobs  *jobs.PendingJobs
+	ResourcePool *jobs.ResourcePool
+	QueueWorker  *jobs.QueueWorker
 	ProcessList  *pr.ProcessList
 	Config       *Config
 }
@@ -82,6 +98,9 @@ func NewRESTHander(gitTag string) *RESTHandler {
 		log.Warn("env variable REPO_URL not set")
 	}
 
+	// Calculate resource limits once at startup
+	resourceLimits := newResourceLimits()
+
 	// working with pointers here so as not to copy large templates, yamls, and ActiveJobs
 	config := RESTHandler{
 		Name:        apiName,
@@ -101,6 +120,7 @@ func NewRESTHander(gitTag string) *RESTHandler {
 		Config: &Config{
 			AdminRoleName:   os.Getenv("AUTH_ADMIN_ROLE"),
 			ServiceRoleName: os.Getenv("AUTH_SERVICE_ROLE"),
+			ResourceLimits:  resourceLimits,
 		},
 	}
 
@@ -159,6 +179,15 @@ func NewRESTHander(gitTag string) *RESTHandler {
 	ac.Jobs = make(map[string]*jobs.Job)
 	config.ActiveJobs = &ac
 
+	// Setup Pending Jobs queue for async jobs waiting for resources
+	config.PendingJobs = jobs.NewPendingJobs()
+
+	// Setup Resource Pool for tracking CPU/memory availability
+	config.ResourcePool = jobs.NewResourcePool(resourceLimits.MaxCPUs, resourceLimits.MaxMemory)
+
+	// Setup Queue Worker to process pending jobs
+	config.QueueWorker = jobs.NewQueueWorker(config.PendingJobs, config.ResourcePool)
+
 	config.MessageQueue = &jobs.MessageQueue{
 		StatusChan: make(chan jobs.StatusMessage, 500),
 		JobDone:    make(chan jobs.Job, 1),
@@ -166,7 +195,7 @@ func NewRESTHander(gitTag string) *RESTHandler {
 
 	// Create local logs directory if not exist
 	pluginsDir := os.Getenv("PLUGINS_DIR") // We already know this env variable exist because it is being checked in plguinsInit function
-	processList, err := pr.LoadProcesses(pluginsDir)
+	processList, err := pr.LoadProcesses(pluginsDir, resourceLimits.MaxCPUs, resourceLimits.MaxMemory)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -231,5 +260,38 @@ func NewStorageService(providerType string) (*s3.S3, error) {
 
 	default:
 		return nil, fmt.Errorf("unsupported storage provider type")
+	}
+}
+
+// newResourceLimits creates ResourceLimits from environment variables.
+// Falls back to 80% of system CPUs and 8GB memory if not specified.
+func newResourceLimits() *ResourceLimits {
+	numCPUs := float32(runtime.NumCPU())
+
+	// Default to 80% of system CPUs
+	maxCPUs := numCPUs * 0.8
+	if envVal := os.Getenv("MAX_QUEUE_CPUS"); envVal != "" {
+		if parsed, err := strconv.ParseFloat(envVal, 32); err == nil {
+			maxCPUs = float32(parsed)
+		} else {
+			log.Warnf("Invalid MAX_QUEUE_CPUS value: %s, using default %.2f", envVal, maxCPUs)
+		}
+	}
+
+	// Default to 8GB
+	maxMemory := 8192
+	if envVal := os.Getenv("MAX_QUEUE_MEMORY_MB"); envVal != "" {
+		if parsed, err := strconv.Atoi(envVal); err == nil {
+			maxMemory = parsed
+		} else {
+			log.Warnf("Invalid MAX_QUEUE_MEMORY_MB value: %s, using default %d", envVal, maxMemory)
+		}
+	}
+
+	log.Infof("ResourceLimits initialized: maxCPUs=%.2f, maxMemory=%dMB", maxCPUs, maxMemory)
+
+	return &ResourceLimits{
+		MaxCPUs:   maxCPUs,
+		MaxMemory: maxMemory,
 	}
 }

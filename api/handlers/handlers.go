@@ -320,6 +320,16 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			return c.JSON(http.StatusInternalServerError, resp)
 		}
 	case "async-execute":
+		// Only queue Docker/Subprocess jobs that need local resources
+		// AWS Batch auto-starts in Create(), no queuing needed
+		switch j.(type) {
+		case *jobs.DockerJob, *jobs.SubprocessJob:
+			// Track queued resources, add to queue, and notify worker
+			res := j.GetResources()
+			rh.ResourcePool.AddQueued(res.CPUs, res.Memory)
+			rh.PendingJobs.Enqueue(&j)
+			rh.QueueWorker.NotifyNewJob()
+		}
 		resp.Status = j.CurrentStatus()
 		return c.JSON(http.StatusCreated, resp)
 	default:
@@ -337,25 +347,36 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 // @Router /jobs/{jobID} [delete]
 // Does not produce HTML
 func (rh *RESTHandler) JobDismissHandler(c echo.Context) error {
-
 	jobID := c.Param("jobID")
-	if j, ok := rh.ActiveJobs.Jobs[jobID]; ok {
 
-		if rh.Config.AuthLevel > 0 {
-			roles := strings.Split(c.Request().Header.Get("X-ProcessAPI-User-Roles"), ",")
-
-			if (*j).SUBMITTER() != c.Request().Header.Get("X-ProcessAPI-User-Email") && !utils.StringInSlice(rh.Config.AdminRoleName, roles) {
-				return c.JSON(http.StatusForbidden, errResponse{Message: "Forbidden"})
-			}
-		}
-
-		err := (*j).Kill()
-		if err != nil {
-			return c.JSON(http.StatusBadRequest, errResponse{Message: err.Error()})
-		}
-		return c.JSON(http.StatusOK, jobResponse{ProcessID: (*j).ProcessID(), Type: "process", JobID: jobID, Status: (*j).CurrentStatus(), Message: fmt.Sprintf("job %s dismissed", jobID)})
+	// 1. Check if job exists in active jobs
+	j, ok := rh.ActiveJobs.Jobs[jobID]
+	if !ok {
+		return c.JSON(http.StatusNotFound, errResponse{Message: fmt.Sprintf("job %s not in the active jobs list", jobID)})
 	}
-	return c.JSON(http.StatusNotFound, errResponse{Message: fmt.Sprintf("job %s not in the active jobs list", jobID)})
+
+	// 2. Check auth
+	if rh.Config.AuthLevel > 0 {
+		roles := strings.Split(c.Request().Header.Get("X-ProcessAPI-User-Roles"), ",")
+		if (*j).SUBMITTER() != c.Request().Header.Get("X-ProcessAPI-User-Email") && !utils.StringInSlice(rh.Config.AdminRoleName, roles) {
+			return c.JSON(http.StatusForbidden, errResponse{Message: "Forbidden"})
+		}
+	}
+
+	// 3. Remove from pending queue if it exists there (job hasn't started yet)
+	removed := rh.PendingJobs.Remove(jobID)
+	if removed != nil {
+		// Job was in queue - update queued resource tracking
+		res := (*removed).GetResources()
+		rh.ResourcePool.RemoveQueued(res.CPUs, res.Memory)
+	}
+
+	// 4. Kill the job
+	err := (*j).Kill()
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, errResponse{Message: err.Error()})
+	}
+	return c.JSON(http.StatusOK, jobResponse{ProcessID: (*j).ProcessID(), Type: "process", JobID: jobID, Status: (*j).CurrentStatus(), Message: fmt.Sprintf("job %s dismissed", jobID)})
 }
 
 // @Summary Job Status

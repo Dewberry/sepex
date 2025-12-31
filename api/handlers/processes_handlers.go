@@ -138,7 +138,7 @@ func (rh *RESTHandler) AddProcessHandler(c echo.Context) error {
 		return prepareResponse(c, http.StatusBadRequest, "error", errResponse{Message: "Process ID mismatch", HTTPStatus: http.StatusBadRequest})
 	}
 
-	err = newProcess.Validate()
+	err = newProcess.Validate(rh.Config.ResourceLimits.MaxCPUs, rh.Config.ResourceLimits.MaxMemory)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, errResponse{Message: err.Error()})
 	}
@@ -200,7 +200,7 @@ func (rh *RESTHandler) UpdateProcessHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, errResponse{Message: "Process ID mismatch"})
 	}
 
-	err = updatedProcess.Validate()
+	err = updatedProcess.Validate(rh.Config.ResourceLimits.MaxCPUs, rh.Config.ResourceLimits.MaxMemory)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, errResponse{Message: err.Error()})
 	}
