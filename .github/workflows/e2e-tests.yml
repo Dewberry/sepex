@@ -29,6 +29,9 @@ jobs:
           echo PLUGINS_DIR='/.data/plugins' >> .env
           echo TMP_JOB_LOGS_DIR='/.data/tmp/logs' >> .env
 
+          echo MAX_LOCAL_CPUS=4 >> .env
+          echo MAX_LOCAL_MEMORY=4096 >> .env
+
 
           echo MINIO_ACCESS_KEY_ID=user >> .env
           echo MINIO_SECRET_ACCESS_KEY=password >> .env
