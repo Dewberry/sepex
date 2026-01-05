@@ -779,7 +779,7 @@ type resourcesResponse struct {
 // @Tags admin
 // @Accept */*
 // @Produce json
-// @Success 200 {object} resourceStatusOutput
+// @Success 200 {object} resourcesResponse
 // @Router /admin/resources [get]
 func (rh *RESTHandler) ResourceStatusHandler(c echo.Context) error {
 	err := validateFormat(c)
