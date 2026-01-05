@@ -294,7 +294,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			var outputs interface{}
 
 			if p.Outputs != nil {
-				outputs, err = jobs.FetchResults(rh.StorageSvc, j.JobID())
+				outputs, err = jobs.FetchResults(rh.StorageSvc, j.JobID(), resp.Status)
 				if err != nil {
 					resp.Message = "error fetching results. Error: " + err.Error()
 					return c.JSON(http.StatusInternalServerError, resp)
@@ -413,7 +413,7 @@ func (rh *RESTHandler) JobResultsHandler(c echo.Context) (err error) {
 
 		switch jRcrd.Status {
 		case jobs.SUCCESSFUL:
-			outputs, err := jobs.FetchResults(rh.StorageSvc, jRcrd.JobID)
+			outputs, err := jobs.FetchResults(rh.StorageSvc, jRcrd.JobID, jRcrd.Status)
 			if err != nil {
 				if err.Error() == "not found" {
 					output := errResponse{HTTPStatus: http.StatusNotFound, Message: "results not available"}
@@ -544,7 +544,7 @@ func (rh *RESTHandler) JobLogsHandler(c echo.Context) (err error) {
 		return prepareResponse(c, http.StatusNotFound, "error", output)
 	}
 
-	logs, err := jobs.FetchLogs(rh.StorageSvc, jobID, false)
+	logs, err := jobs.FetchLogs(rh.StorageSvc, jobID, status, false)
 	if err != nil {
 		output := errResponse{HTTPStatus: http.StatusInternalServerError, Message: "error while fetching logs: " + err.Error()}
 		return prepareResponse(c, http.StatusInternalServerError, "error", output)
