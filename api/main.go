@@ -4,6 +4,7 @@ import (
 	"app/auth"
 	_ "app/docs"
 	"app/handlers"
+	"app/jobs"
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -28,7 +29,7 @@ import (
 
 var (
 	// Build-time version information
-	GitTag    = "unknown" // will be injected at build-time
+	GitTag = "unknown" // will be injected at build-time
 )
 
 var (
@@ -260,9 +261,20 @@ func main() {
 
 	// Initialize resources
 	rh := handlers.NewRESTHander(GitTag)
+
 	// todo: handle this error: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running
 	// todo: all non terminated job statuses should be updated to unknown
 	// todo: all logs in the logs directory should be moved to storage
+	err := jobs.RecoverDockerJobs(
+		rh.DB,
+		rh.StorageSvc,
+		rh.ActiveJobs,
+		rh.MessageQueue.JobDone,
+	)
+
+	if err != nil {
+		log.Errorf("docker recovery failed: %v", err)
+	}
 
 	// Goroutines
 	go rh.StatusUpdateRoutine()

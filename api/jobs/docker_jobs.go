@@ -481,3 +481,31 @@ func (j *DockerJob) Close() {
 		DeleteLocalLogs(j.StorageSvc, j.UUID, j.ProcessName)
 	}()
 }
+
+func NewRecoveredDockerJob(
+	r JobRecord,
+	db Database,
+	storageSvc *s3.S3,
+	doneChan chan Job,
+) (*DockerJob, error) {
+
+	job := &DockerJob{
+		UUID:        r.JobID,
+		ContainerID: r.HostJobID,
+		ProcessName: r.ProcessID,
+		Status:      RUNNING,
+		DB:          db,
+		StorageSvc:  storageSvc,
+		DoneChan:    doneChan,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	job.ctx = ctx
+	job.ctxCancel = cancel
+
+	if err := job.initLogger(); err != nil {
+		return nil, err
+	}
+
+	return job, nil
+}
