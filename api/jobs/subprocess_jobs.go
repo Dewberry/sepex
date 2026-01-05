@@ -22,6 +22,8 @@ type SubprocessJob struct {
 	wg sync.WaitGroup
 	// Used for monitoring running complete for sync jobs
 	wgRun sync.WaitGroup
+	// closeOnce ensures Close() body executes exactly once
+	closeOnce sync.Once
 
 	UUID           string `json:"jobID"`
 	PID            string
@@ -39,9 +41,11 @@ type SubprocessJob struct {
 	logFile *os.File
 
 	Resources
-	DB         Database
-	StorageSvc *s3.S3
-	DoneChan   chan Job
+	DB           Database
+	StorageSvc   *s3.S3
+	DoneChan     chan Job
+	ResourcePool *ResourcePool
+	IsSync       bool
 }
 
 func (j *SubprocessJob) WaitForRunCompletion() {
@@ -66,6 +70,10 @@ func (j *SubprocessJob) SUBMITTER() string {
 
 func (j *SubprocessJob) CMD() []string {
 	return j.Cmd
+}
+
+func (j *SubprocessJob) GetResources() Resources {
+	return j.Resources
 }
 
 func (j *SubprocessJob) LogMessage(m string, level log.Level) {
@@ -153,6 +161,22 @@ func (j *SubprocessJob) initLogger() error {
 }
 
 func (j *SubprocessJob) Create() error {
+	// Only reserve resources for sync jobs at creation time
+	// Async jobs will have resources reserved when QueueWorker starts them
+	if j.IsSync {
+		if !j.ResourcePool.TryReserve(j.Resources.CPUs, j.Resources.Memory) {
+			return fmt.Errorf("resources unavailable")
+		}
+	}
+
+	// Track if creation succeeded to handle cleanup on error
+	success := false
+	defer func() {
+		if !success && j.IsSync {
+			j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory)
+		}
+	}()
+
 	err := j.initLogger()
 	if err != nil {
 		return err
@@ -171,29 +195,35 @@ func (j *SubprocessJob) Create() error {
 	}
 
 	j.NewStatusUpdate(ACCEPTED, time.Time{})
+
+	// Increment wgRun here so WaitForRunCompletion() blocks
+	// even if QueueWorker hasn't called StartRun() yet
 	j.wgRun.Add(1)
-	go j.Run()
+
+	success = true
 	return nil
 }
 
-func (j *SubprocessJob) Run() {
-	// Helper function to check if context is cancelled.
-	isCancelled := func() bool {
-		select {
-		case <-j.ctx.Done():
-			j.logger.Info("Context cancelled.")
-			return true
-		default:
-			return false
-		}
-	}
+func (j *SubprocessJob) IsSyncJob() bool {
+	return j.IsSync
+}
 
-	// defers are executed in LIFO order
-	defer j.wgRun.Done()
+func (j *SubprocessJob) Run() {
+	// Single consolidated defer for all cleanup operations.
+	// Order of operations:
+	//   1. Recover from panic (if any) and mark job as FAILED
+	//   2. Release resources - free CPU/memory for next job in queue
+	//   3. Close() - cleanup process, logs, remove from ActiveJobs
+	//      (closeOnce guarantees this only executes once, even if Kill() also called Close())
+	//   4. wgRun.Done() - unblock sync job waiters after results are available
 	defer func() {
-		if !isCancelled() {
-			j.Close()
+		if r := recover(); r != nil {
+			j.logger.Errorf("Run() panicked: %v", r)
+			j.NewStatusUpdate(FAILED, time.Time{})
 		}
+		j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory)
+		j.Close()
+		j.wgRun.Done()
 	}()
 
 	// Prepare the command
@@ -230,8 +260,11 @@ func (j *SubprocessJob) Run() {
 	j.PID = fmt.Sprintf("%d", j.execCmd.Process.Pid)
 	j.NewStatusUpdate(RUNNING, time.Time{})
 
-	if isCancelled() {
+	// Check if job was cancelled (Kill() was called) before waiting for process
+	select {
+	case <-j.ctx.Done():
 		return
+	default:
 	}
 
 	// Wait for the process to finish
@@ -264,9 +297,12 @@ func (j *SubprocessJob) Kill() error {
 	// If a dismiss status is updated the job is considered dismissed at this point
 	// Close being graceful or not does not matter.
 
-	defer func() {
-		go j.Close()
-	}()
+	// Cancel context to signal Run() to exit early if still executing.
+	// Close() is safe to call from both here and Run()'s defer because
+	// closeOnce guarantees the cleanup body executes exactly once.
+	j.ctxCancel()
+
+	go j.Close()
 	return nil
 }
 
@@ -311,32 +347,39 @@ func (j *SubprocessJob) RunFinished() {
 
 // Write final logs, cancelCtx
 func (j *SubprocessJob) Close() {
-	j.logger.Info("Starting closing routine.")
-	// to do: add panic recover to remove job from active jobs even if following panics
-	j.ctxCancel() // Signal Run function to terminate if running
+	// closeOnce.Do() ensures this cleanup runs exactly once, even if Close() is called
+	// multiple times concurrently.
+	//
+	// How sync.Once works:
+	//   - First caller: acquires internal lock, executes the function, marks done
+	//   - Concurrent/subsequent callers: see done flag, return immediately without executing
+	j.closeOnce.Do(func() {
+		j.logger.Info("Starting closing routine.")
+		j.ctxCancel() // Signal Run function to terminate if running
 
-	// Following is not needed since we are using context to signal job termination
-	// if j.execCmd.Process != nil && j.execCmd.ProcessState == nil {
-	// 	// Process related cleanups if process state is nil meaning process is still running
-	// 	err := j.execCmd.Process.Kill()
-	// 	if err != nil {
-	// 		j.logger.Errorf("Could not kill process. Error: %s", err.Error())
-	// 	}
-	// }
+		// // Following is not needed since we are using context to signal job termination
+		// if j.execCmd.Process != nil && j.execCmd.ProcessState == nil {
+		// 	// Process related cleanups if process state is nil meaning process is still running
+		// 	err := j.execCmd.Process.Kill()
+		// 	if err != nil {
+		// 		j.logger.Errorf("Could not kill process. Error: %s", err.Error())
+		// 	}
+		// }
 
-	j.DoneChan <- j // At this point job can be safely removed from active jobs
+		j.DoneChan <- j // At this point job can be safely removed from active jobs
 
-	go func() {
-		j.wg.Wait() // wait if other routines like metadata are running
-		j.logFile.Close()
-		UploadLogsToStorage(j.StorageSvc, j.UUID, j.ProcessName)
-		// It is expected that logs will be requested multiple times for a recently finished job
-		// so we are waiting for one hour to before deleting the local copy
-		// so that we can avoid repetitive request to storage service.
-		// If the server shutdown, these files would need to be manually deleted
-		time.Sleep(time.Hour)
-		DeleteLocalLogs(j.StorageSvc, j.UUID, j.ProcessName)
-	}()
+		go func() {
+			j.wg.Wait() // wait if other routines like metadata are running
+			j.logFile.Close()
+			UploadLogsToStorage(j.StorageSvc, j.UUID, j.ProcessName)
+			// It is expected that logs will be requested multiple times for a recently finished job
+			// so we are waiting for one hour to before deleting the local copy
+			// so that we can avoid repetitive request to storage service.
+			// If the server shutdown, these files would need to be manually deleted
+			time.Sleep(time.Hour)
+			DeleteLocalLogs(j.StorageSvc, j.UUID, j.ProcessName)
+		}()
+	})
 }
 
 func (j *SubprocessJob) IMAGE() string {

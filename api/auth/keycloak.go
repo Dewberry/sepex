@@ -132,14 +132,14 @@ func (kas *KeycloakAuthStrategy) ValidateToken(tokenString string) (*Claims, err
 	return &claims, nil
 }
 
-// Validate X-ProcessAPI-User-Email header against user from claims
+// Validate X-SEPEX-User-Email header against user from claims
 func (kas *KeycloakAuthStrategy) ValidateUser(c echo.Context, claims *Claims) (err error) {
 	roles := claims.RealmAccess["roles"]
 
 	if kas.ServiceRoleName != "" && overlap(roles, []string{kas.ServiceRoleName}) {
 		// assume provided header is correct
-	} else if claims.Email == "" || !(c.Request().Header.Get("X-ProcessAPI-User-Email") == claims.Email) {
-		return fmt.Errorf("invalid X-ProcessAPI-User-Email header")
+	} else if claims.Email == "" || !(c.Request().Header.Get("X-SEPEX-User-Email") == claims.Email) {
+		return fmt.Errorf("invalid X-SEPEX-User-Email header")
 	}
 
 	return nil
@@ -150,7 +150,7 @@ func (kas *KeycloakAuthStrategy) SetUserRolesHeader(c echo.Context, claims *Clai
 	roles, exists := claims.RealmAccess["roles"]
 	if exists {
 		rolesString := strings.Join(roles, ",")
-		c.Request().Header.Set("X-ProcessAPI-User-Roles", rolesString)
+		c.Request().Header.Set("X-SEPEX-User-Roles", rolesString)
 	} else {
 		return nil
 	}

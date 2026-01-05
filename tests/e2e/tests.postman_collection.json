@@ -1,11 +1,108 @@
 {
 	"info": {
-		"_postman_id": "102d8747-8fb1-44b4-89f8-9a06d1bf6d6d",
+		"_postman_id": "e4cfedee-5b49-464a-beba-6a8a9648e76e",
 		"name": "sepex Testing",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "36773789"
 	},
 	"item": [
+		{
+			"name": "admin",
+			"item": [
+				{
+					"name": "resources",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has resources object', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('resources');",
+									"});",
+									"",
+									"pm.test('Response has links array', function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('links');",
+									"    pm.expect(jsonData.links).to.be.an('array');",
+									"});",
+									"",
+									"pm.test('Resources has required fields', function () {",
+									"    var resources = pm.response.json().resources;",
+									"    pm.expect(resources).to.have.property('usedCPUs');",
+									"    pm.expect(resources).to.have.property('usedMemory');",
+									"    pm.expect(resources).to.have.property('queuedCPUs');",
+									"    pm.expect(resources).to.have.property('queuedMemory');",
+									"    pm.expect(resources).to.have.property('maxCPUs');",
+									"    pm.expect(resources).to.have.property('maxMemory');",
+									"    pm.expect(resources).to.have.property('usedCPUsPct');",
+									"    pm.expect(resources).to.have.property('queuedCPUsPct');",
+									"    pm.expect(resources).to.have.property('usedMemPct');",
+									"    pm.expect(resources).to.have.property('queuedMemPct');",
+									"});",
+									"",
+									"pm.test('Percentage values are valid numbers', function () {",
+									"    var resources = pm.response.json().resources;",
+									"    pm.expect(resources.usedCPUsPct).to.be.a('number');",
+									"    pm.expect(resources.usedMemPct).to.be.a('number');",
+									"    pm.expect(resources.queuedCPUsPct).to.be.a('number');",
+									"    pm.expect(resources.queuedMemPct).to.be.a('number');",
+									"});",
+									"",
+									"pm.test('Max values are greater than 0', function () {",
+									"    var resources = pm.response.json().resources;",
+									"    pm.expect(resources.maxCPUs).to.be.above(0);",
+									"    pm.expect(resources.maxMemory).to.be.above(0);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{url}}/admin/resources",
+							"host": [
+								"{{url}}"
+							],
+							"path": [
+								"admin",
+								"resources"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							"pm.test(\"Response time is less than 1000ms\", function () {",
+							"    pm.expect(pm.response.responseTime).to.be.below(1000);",
+							"});"
+						]
+					}
+				}
+			]
+		},
 		{
 			"name": "startup",
 			"item": [
@@ -2062,6 +2159,361 @@
 					}
 				}
 			]
+		},
+		{
+			"name": "scheduler",
+			"item": [
+				{
+					"name": "setup",
+					"item": [
+						{
+							"name": "register-sleeper-async-process",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Process registered successfully', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"info\": {\n        \"version\": \"1.0.0\",\n        \"id\": \"sleeperAsync\",\n        \"title\": \"Sleeper Async Test Process\",\n        \"description\": \"A test process that sleeps for 10 seconds (async)\",\n        \"jobControlOptions\": [\"async-execute\"],\n        \"outputTransmission\": [\"value\"]\n    },\n    \"host\": {\n        \"type\": \"subprocess\"\n    },\n    \"command\": [\"bash\", \"-c\", \"sleep 10 && echo '{\\\"plugin_results\\\": \\\"slept for 10 seconds!\\\"}'\" ],\n    \"config\": {\n        \"maxResources\": {\n            \"cpus\": 4.0,\n            \"memory\": 4096\n        }\n    },\n    \"inputs\": [],\n    \"outputs\": []\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{url}}/processes/sleeperAsync",
+									"host": [
+										"{{url}}"
+									],
+									"path": [
+										"processes",
+										"sleeperAsync"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "register-sleeper-sync-process",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Process registered successfully', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"info\": {\n        \"version\": \"1.0.0\",\n        \"id\": \"sleeperSync\",\n        \"title\": \"Sleeper Sync Test Process\",\n        \"description\": \"A test process that sleeps for 10 seconds (sync)\",\n        \"jobControlOptions\": [\"sync-execute\"],\n        \"outputTransmission\": [\"value\"]\n    },\n    \"host\": {\n        \"type\": \"subprocess\"\n    },\n    \"command\": [\"bash\", \"-c\", \"sleep 10 && echo '{\\\"plugin_results\\\": \\\"slept for 10 seconds!\\\"}'\" ],\n    \"config\": {\n        \"maxResources\": {\n            \"cpus\": 4.0,\n            \"memory\": 4096\n        }\n    },\n    \"inputs\": [],\n    \"outputs\": []\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{url}}/processes/sleeperSync",
+									"host": [
+										"{{url}}"
+									],
+									"path": [
+										"processes",
+										"sleeperSync"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "resource-contention",
+					"item": [
+						{
+							"name": "submit-async-sleeper",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 201', function () {",
+											"    pm.response.to.have.status(201);",
+											"});",
+											"",
+											"var resp = pm.response.json();",
+											"pm.collectionVariables.set('sleeperJobID', resp.jobID);"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Prefer",
+										"value": "respond-async"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"inputs\": {}\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{url}}/processes/sleeperAsync/execution",
+									"host": [
+										"{{url}}"
+									],
+									"path": [
+										"processes",
+										"sleeperAsync",
+										"execution"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "check-resources-in-use",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test('Resources are in use or queued', function () {",
+											"    var resources = pm.response.json().resources;",
+											"    var totalCPUs = resources.usedCPUs + resources.queuedCPUs;",
+											"    pm.expect(totalCPUs).to.be.above(0);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{url}}/admin/resources",
+									"host": [
+										"{{url}}"
+									],
+									"path": [
+										"admin",
+										"resources"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "sync-job-fails-when-resources-full",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Sync job returns 503 when resources unavailable', function () {",
+											"    pm.response.to.have.status(503);",
+											"});",
+											"",
+											"pm.test('Response has appropriate error message', function () {",
+											"    var resp = pm.response.json();",
+											"    pm.expect(resp.message).to.include('resources');",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"inputs\": {}\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{url}}/processes/sleeperSync/execution",
+									"host": [
+										"{{url}}"
+									],
+									"path": [
+										"processes",
+										"sleeperSync",
+										"execution"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "sync-job-succeeds-after-wait",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Sync job succeeds when resources available', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test('Job completed successfully', function () {",
+											"    var resp = pm.response.json();",
+											"    pm.expect(resp.status).to.eql('successful');",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								},
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											"// Wait 10 seconds for the async sleeper job to complete",
+											"setTimeout(() => {}, 10000);"
+										],
+										"type": "text/javascript",
+										"packages": {},
+										"requests": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"inputs\": {}\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{url}}/processes/sleeperSync/execution",
+									"host": [
+										"{{url}}"
+									],
+									"path": [
+										"processes",
+										"sleeperSync",
+										"execution"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "cleanup",
+					"item": [
+						{
+							"name": "delete-sleeper-async",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Process deleted successfully', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{url}}/processes/sleeperAsync",
+									"host": [
+										"{{url}}"
+									],
+									"path": [
+										"processes",
+										"sleeperAsync"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "delete-sleeper-sync",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Process deleted successfully', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{url}}/processes/sleeperSync",
+									"host": [
+										"{{url}}"
+									],
+									"path": [
+										"processes",
+										"sleeperSync"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			],
+			"description": "Tests for the local scheduler resource management"
 		}
 	],
 	"event": [
@@ -2069,6 +2521,7 @@
 			"listen": "prerequest",
 			"script": {
 				"type": "text/javascript",
+				"requests": {},
 				"exec": [
 					""
 				]
@@ -2078,6 +2531,7 @@
 			"listen": "test",
 			"script": {
 				"type": "text/javascript",
+				"requests": {},
 				"exec": [
 					"pm.test(\"response must be valid and have a body\", function () {",
 					"     pm.response.to.be.withBody;",
@@ -2090,11 +2544,22 @@
 	"variable": [
 		{
 			"key": "url",
-			"value": "localhost:5050",
-			"type": "default"
+			"value": "localhost:5050"
 		},
 		{
 			"key": "jobID",
+			"value": ""
+		},
+		{
+			"key": "sleeperJobID",
+			"value": ""
+		},
+		{
+			"key": "maxCPUs",
+			"value": ""
+		},
+		{
+			"key": "maxMemory",
 			"value": ""
 		}
 	]

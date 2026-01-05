@@ -9,6 +9,18 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Unreleased
 
+### API
+#### GET /admin/resources
+- New endpoint to view resource utilization for local jobs (docker, subprocess) and queue status
+
+### Configuration
+- New `MAX_LOCAL_CPUS` and `MAX_LOCAL_MEMORY` environment variables (or `--max-local-cpus` and `--max-local-memory` CLI flags) to set resource limits for local job scheduling
+- Process definitions are validated against these limits at startup and when adding/updating processes via API
+- Processes without explicit resource requirements use default values
+
+### Documentation
+- Added sequence diagram for local scheduler
+
 ## [0.2.1] - 2025-12-03
 
 ### API

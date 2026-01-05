@@ -173,7 +173,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 	}
 
 	if rh.Config.AuthLevel > 0 {
-		roles := strings.Split(c.Request().Header.Get("X-ProcessAPI-User-Roles"), ",")
+		roles := strings.Split(c.Request().Header.Get("X-SEPEX-User-Roles"), ",")
 
 		// admins are allowed to execute all processes, else you need to have a role with same name as processId
 		if !utils.StringInSlice(rh.Config.AdminRoleName, roles) && !utils.StringInSlice(processID, roles) {
@@ -225,7 +225,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 	// 	params.Inputs["resultsCallbackUri"] = fmt.Sprintf("%s/jobs/%s/results_update", os.Getenv("API_URL_PUBLIC"), jobID)
 	// }
 
-	submitter := c.Request().Header.Get("X-ProcessAPI-User-Email")
+	submitter := c.Request().Header.Get("X-SEPEX-User-Email")
 	var j jobs.Job
 	switch host {
 	case "docker":
@@ -242,6 +242,8 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			StorageSvc:     rh.StorageSvc,
 			DB:             rh.DB,
 			DoneChan:       rh.MessageQueue.JobDone,
+			ResourcePool:   rh.ResourcePool,
+			IsSync:         mode == "sync-execute",
 		}
 
 	case "aws-batch":
@@ -269,15 +271,24 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			EnvVars:        p.Config.EnvVars,
 			Cmd:            cmd,
 			ProcessVersion: p.Info.Version,
+			Resources:      jobs.Resources(p.Config.Resources),
 			StorageSvc:     rh.StorageSvc,
 			DB:             rh.DB,
 			DoneChan:       rh.MessageQueue.JobDone,
+			ResourcePool:   rh.ResourcePool,
+			IsSync:         mode == "sync-execute",
 		}
 	}
 
-	// Create job
+	// Create job (reserves resources for sync docker/subprocess jobs)
 	err = j.Create()
 	if err != nil {
+		if err.Error() == "resources unavailable" {
+			// Only sync jobs can fail with this error
+			return c.JSON(http.StatusServiceUnavailable, errResponse{
+				Message: "Server resources are backlogged for local job execution. Use async-execute mode (if available for this process) or retry later.",
+			})
+		}
 		return c.JSON(http.StatusInternalServerError, errResponse{Message: fmt.Sprintf("submission error %s", err.Error())})
 	}
 
@@ -287,6 +298,8 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 	resp := jobResponse{ProcessID: j.ProcessID(), Type: "process", JobID: jobID, Status: j.CurrentStatus()}
 	switch mode {
 	case "sync-execute":
+		j.Run()
+		// wgRun.Add(1) is called in Create() so WaitForRunCompletion() blocks correctly
 		j.WaitForRunCompletion()
 		resp.Status = j.CurrentStatus()
 
@@ -307,6 +320,16 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			return c.JSON(http.StatusInternalServerError, resp)
 		}
 	case "async-execute":
+		// Only queue Docker/Subprocess jobs that need local resources
+		// AWS Batch auto-starts in Create(), no queuing needed
+		switch j.(type) {
+		case *jobs.DockerJob, *jobs.SubprocessJob:
+			// Track queued resources, add to queue, and notify worker
+			res := j.GetResources()
+			rh.ResourcePool.AddQueued(res.CPUs, res.Memory)
+			rh.PendingJobs.Enqueue(&j)
+			rh.QueueWorker.NotifyNewJob()
+		}
 		resp.Status = j.CurrentStatus()
 		return c.JSON(http.StatusCreated, resp)
 	default:
@@ -324,25 +347,36 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 // @Router /jobs/{jobID} [delete]
 // Does not produce HTML
 func (rh *RESTHandler) JobDismissHandler(c echo.Context) error {
-
 	jobID := c.Param("jobID")
-	if j, ok := rh.ActiveJobs.Jobs[jobID]; ok {
 
-		if rh.Config.AuthLevel > 0 {
-			roles := strings.Split(c.Request().Header.Get("X-ProcessAPI-User-Roles"), ",")
-
-			if (*j).SUBMITTER() != c.Request().Header.Get("X-ProcessAPI-User-Email") && !utils.StringInSlice(rh.Config.AdminRoleName, roles) {
-				return c.JSON(http.StatusForbidden, errResponse{Message: "Forbidden"})
-			}
-		}
-
-		err := (*j).Kill()
-		if err != nil {
-			return c.JSON(http.StatusBadRequest, errResponse{Message: err.Error()})
-		}
-		return c.JSON(http.StatusOK, jobResponse{ProcessID: (*j).ProcessID(), Type: "process", JobID: jobID, Status: (*j).CurrentStatus(), Message: fmt.Sprintf("job %s dismissed", jobID)})
+	// 1. Check if job exists in active jobs
+	j, ok := rh.ActiveJobs.Jobs[jobID]
+	if !ok {
+		return c.JSON(http.StatusNotFound, errResponse{Message: fmt.Sprintf("job %s not in the active jobs list", jobID)})
 	}
-	return c.JSON(http.StatusNotFound, errResponse{Message: fmt.Sprintf("job %s not in the active jobs list", jobID)})
+
+	// 2. Check auth
+	if rh.Config.AuthLevel > 0 {
+		roles := strings.Split(c.Request().Header.Get("X-SEPEX-User-Roles"), ",")
+		if (*j).SUBMITTER() != c.Request().Header.Get("X-SEPEX-User-Email") && !utils.StringInSlice(rh.Config.AdminRoleName, roles) {
+			return c.JSON(http.StatusForbidden, errResponse{Message: "Forbidden"})
+		}
+	}
+
+	// 3. Remove from pending queue if it exists there (job hasn't started yet)
+	removed := rh.PendingJobs.Remove(jobID)
+	if removed != nil {
+		// Job was in queue - update queued resource tracking
+		res := (*removed).GetResources()
+		rh.ResourcePool.RemoveQueued(res.CPUs, res.Memory)
+	}
+
+	// 4. Kill the job
+	err := (*j).Kill()
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, errResponse{Message: err.Error()})
+	}
+	return c.JSON(http.StatusOK, jobResponse{ProcessID: (*j).ProcessID(), Type: "process", JobID: jobID, Status: (*j).CurrentStatus(), Message: fmt.Sprintf("job %s dismissed", jobID)})
 }
 
 // @Summary Job Status
@@ -595,10 +629,10 @@ func (rh *RESTHandler) ListJobsHandler(c echo.Context) error {
 	}
 
 	if rh.Config.AuthLevel > 1 { // changed for hotfix, should be > 0 when clients are updated
-		roles := strings.Split(c.Request().Header.Get("X-ProcessAPI-User-Roles"), ",")
+		roles := strings.Split(c.Request().Header.Get("X-SEPEX-User-Roles"), ",")
 
 		if !utils.StringInSlice(rh.Config.AdminRoleName, roles) {
-			submitters = c.Request().Header.Get("X-ProcessAPI-User-Email")
+			submitters = c.Request().Header.Get("X-SEPEX-User-Email")
 		}
 	}
 
@@ -655,7 +689,7 @@ func (rh *RESTHandler) ListJobsHandler(c echo.Context) error {
 // Time must be in RFC3339(ISO) format
 func (rh *RESTHandler) JobStatusUpdateHandler(c echo.Context) error {
 	if rh.Config.AuthLevel > 0 {
-		roles := strings.Split(c.Request().Header.Get("X-ProcessAPI-User-Roles"), ",")
+		roles := strings.Split(c.Request().Header.Get("X-SEPEX-User-Roles"), ",")
 
 		// only service accounts or admins can post status updates
 		if !utils.StringInSlice(rh.Config.ServiceRoleName, roles) && !utils.StringInSlice(rh.Config.AdminRoleName, roles) {
@@ -725,3 +759,61 @@ func (rh *RESTHandler) JobStatusUpdateHandler(c echo.Context) error {
 // 	}
 
 // }
+
+// resourcesResponse provides resource utilization data for JSON API and HTML rendering
+type resourcesResponse struct {
+	UsedCPUs      float32 `json:"usedCPUs"`
+	UsedMemory    int     `json:"usedMemory"`
+	QueuedCPUs    float32 `json:"queuedCPUs"`
+	QueuedMemory  int     `json:"queuedMemory"`
+	MaxCPUs       float32 `json:"maxCPUs"`
+	MaxMemory     int     `json:"maxMemory"`
+	UsedCPUsPct   float32 `json:"usedCPUsPct"`
+	QueuedCPUsPct float32 `json:"queuedCPUsPct"`
+	UsedMemPct    float32 `json:"usedMemPct"`
+	QueuedMemPct  float32 `json:"queuedMemPct"`
+}
+
+// @Summary Resource Status
+// @Description Returns current resource utilization for local job scheduling
+// @Tags admin
+// @Accept */*
+// @Produce json
+// @Success 200 {object} resourcesResponse
+// @Router /admin/resources [get]
+func (rh *RESTHandler) ResourceStatusHandler(c echo.Context) error {
+	err := validateFormat(c)
+	if err != nil {
+		return err
+	}
+
+	status := rh.ResourcePool.GetStatus()
+
+	resources := resourcesResponse{
+		UsedCPUs:     status.UsedCPUs,
+		UsedMemory:   status.UsedMemory,
+		QueuedCPUs:   status.QueuedCPUs,
+		QueuedMemory: status.QueuedMemory,
+		MaxCPUs:      status.MaxCPUs,
+		MaxMemory:    status.MaxMemory,
+	}
+
+	if status.MaxCPUs > 0 {
+		resources.UsedCPUsPct = (status.UsedCPUs / status.MaxCPUs) * 100
+		resources.QueuedCPUsPct = (status.QueuedCPUs / status.MaxCPUs) * 100
+	}
+	if status.MaxMemory > 0 {
+		resources.UsedMemPct = (float32(status.UsedMemory) / float32(status.MaxMemory)) * 100
+		resources.QueuedMemPct = (float32(status.QueuedMemory) / float32(status.MaxMemory)) * 100
+	}
+
+	links := []link{
+		{Href: "/admin/resources", Rel: "self", Title: "this document"},
+	}
+
+	output := make(map[string]interface{})
+	output["resources"] = resources
+	output["links"] = links
+
+	return prepareResponse(c, http.StatusOK, "resourceStatus", output)
+}

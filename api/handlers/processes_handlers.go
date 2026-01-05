@@ -113,7 +113,7 @@ func (rh *RESTHandler) ProcessDescribeHandler(c echo.Context) error {
 func (rh *RESTHandler) AddProcessHandler(c echo.Context) error {
 
 	if rh.Config.AuthLevel > 0 {
-		roles := strings.Split(c.Request().Header.Get("X-ProcessAPI-User-Roles"), ",")
+		roles := strings.Split(c.Request().Header.Get("X-SEPEX-User-Roles"), ",")
 
 		// non-admins are not allowed
 		if !utils.StringInSlice(rh.Config.AdminRoleName, roles) {
@@ -138,7 +138,7 @@ func (rh *RESTHandler) AddProcessHandler(c echo.Context) error {
 		return prepareResponse(c, http.StatusBadRequest, "error", errResponse{Message: "Process ID mismatch", HTTPStatus: http.StatusBadRequest})
 	}
 
-	err = newProcess.Validate()
+	err = newProcess.Validate(rh.Config.ResourceLimits.MaxCPUs, rh.Config.ResourceLimits.MaxMemory)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, errResponse{Message: err.Error()})
 	}
@@ -175,7 +175,7 @@ func (rh *RESTHandler) AddProcessHandler(c echo.Context) error {
 func (rh *RESTHandler) UpdateProcessHandler(c echo.Context) error {
 
 	if rh.Config.AuthLevel > 0 {
-		roles := strings.Split(c.Request().Header.Get("X-ProcessAPI-User-Roles"), ",")
+		roles := strings.Split(c.Request().Header.Get("X-SEPEX-User-Roles"), ",")
 
 		// non-admins are not allowed
 		if !utils.StringInSlice(rh.Config.AdminRoleName, roles) {
@@ -200,7 +200,7 @@ func (rh *RESTHandler) UpdateProcessHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, errResponse{Message: "Process ID mismatch"})
 	}
 
-	err = updatedProcess.Validate()
+	err = updatedProcess.Validate(rh.Config.ResourceLimits.MaxCPUs, rh.Config.ResourceLimits.MaxMemory)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, errResponse{Message: err.Error()})
 	}
@@ -246,7 +246,7 @@ func (rh *RESTHandler) UpdateProcessHandler(c echo.Context) error {
 func (rh *RESTHandler) DeleteProcessHandler(c echo.Context) error {
 
 	if rh.Config.AuthLevel > 0 {
-		roles := strings.Split(c.Request().Header.Get("X-ProcessAPI-User-Roles"), ",")
+		roles := strings.Split(c.Request().Header.Get("X-SEPEX-User-Roles"), ",")
 
 		// non-admins are not allowed
 		if !utils.StringInSlice(rh.Config.AdminRoleName, roles) {

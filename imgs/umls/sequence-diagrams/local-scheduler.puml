@@ -1,0 +1,65 @@
+@startuml local-scheduler
+!theme mars
+
+title Local Scheduler Flow
+header
+    Async docker/subprocess job with resource-based scheduling.
+    Job waits in queue until resources are available.
+end header
+
+participant User
+participant Handler
+entity ResourcePool
+entity PendingJobs
+entity QueueWorker
+entity Job
+
+User -> Handler: Submit async job\n(docker/subprocess)
+activate Handler
+
+Handler -> Handler: Validate request against\nprocess configuration
+
+Handler -> Job: Create new job with Job ID
+activate Job
+
+Handler -> ResourcePool: AddQueued(cpus, mem)
+
+Handler -> PendingJobs: Enqueue(job)
+
+Handler -> QueueWorker: NotifyNewJob()
+note over QueueWorker: QueueWorker wakes up
+activate QueueWorker
+
+Handler --> User: Respond with 201 and Job ID
+deactivate Handler
+
+QueueWorker -> PendingJobs: Peek()
+PendingJobs --> QueueWorker: Return front job
+
+QueueWorker -> ResourcePool: TryReserve(cpus, mem)
+alt Resources available
+    ResourcePool --> QueueWorker: true (resources added to\n"used" bucket)
+
+    QueueWorker -> PendingJobs: Remove Job from Pending Jobs
+    PendingJobs --> QueueWorker: Return job
+    QueueWorker -> ResourcePool: RemoveQueued(cpus, mem)
+
+    QueueWorker -> Job: Start execution
+    note over QueueWorker: TryReserve for next job in queue
+    note over Job: Job starts executing
+else Resources unavailable
+    ResourcePool --> QueueWorker: false
+    deactivate QueueWorker
+    note over QueueWorker: QueueWorker goes\nback to sleep
+end
+
+note over Job: Job finishes execution
+deactivate Job
+
+Job -> ResourcePool: Release(cpus, mem)
+
+ResourcePool -> QueueWorker: Signal resources released
+activate QueueWorker
+note over QueueWorker: QueueWorker wakes up
+
+@enduml
