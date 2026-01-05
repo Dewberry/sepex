@@ -10,6 +10,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ## Unreleased
 
 ### API
+#### POST /processes/{processID}/execution
+- Execution mode now determined per OGC API - Processes Requirements 25/26: honors `Prefer: respond-async` header when process supports both modes, defaults to sync otherwise
+- Returns `Preference-Applied` response header when async preference is honored
+
 #### GET /admin/resources
 - New endpoint to view resource utilization for local jobs (docker, subprocess) and queue status
 

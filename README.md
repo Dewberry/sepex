@@ -67,7 +67,8 @@ Processes are computational tasks described through a configuration file that ca
 
 ### Jobs
 ![](imgs/readme/jobs.png)
-Each execution of a process is called a job. A job can be synchronous or asynchronous depending on which host it is being executed upon. Synchronous jobs return responses after the job has reached a finished state, meaning either successful or failed. The asynchronous jobs return a response immediately with a job id for the client so that the client can monitor the jobs.
+Each execution of a process is called a job. A job can be synchronous or asynchronous depending on the process configuration and client preference. Synchronous jobs return responses after the job has reached a finished state, meaning either successful or failed. The asynchronous jobs return a response immediately with a job id for the client so that the client can monitor the jobs.
+
 
 *Note on Processes: The developers must make sure they choose the right platform to execute a process. The processes that are short-lived and fast and do not create a file resource as an output, for example getting the water surface elevation values for a coordinate from cloud raster, must be registered to run on the local machine so that they are synchronous. These kinds of processes should output data in JSON format.*
 

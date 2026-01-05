@@ -211,7 +211,11 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 		cmd = append(cmd, string(jsonParams))
 	}
 
-	mode := p.Info.JobControlOptions[0]
+	// Determine execution mode based on process capabilities and client preference
+	// per OGC API - Processes Requirements 25, 26 and Recommendation 12A
+	preferHeader := c.Request().Header.Get("Prefer")
+	modeResult := DetermineExecutionMode(p.Info.JobControlOptions, preferHeader)
+	mode := modeResult.Mode
 	host := p.Host.Type
 
 	// ----------- Process related setup is complete at this point ---------
@@ -294,6 +298,11 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 
 	// Add to active jobs
 	rh.ActiveJobs.Add(&j)
+
+	// Add Preference-Applied header if a preference was honored (Rec 14)
+	if modeResult.PreferenceApplied != "" {
+		c.Response().Header().Set("Preference-Applied", modeResult.PreferenceApplied)
+	}
 
 	resp := jobResponse{ProcessID: j.ProcessID(), Type: "process", JobID: jobID, Status: j.CurrentStatus()}
 	switch mode {

@@ -1883,6 +1883,671 @@
 							}
 						}
 					]
+				},
+				{
+					"name": "execution-mode",
+					"item": [
+						{
+							"name": "setup",
+							"item": [
+								{
+									"name": "register-both-modes-process",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"pm.test('Process registered successfully', function () {",
+													"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"info\": {\n        \"version\": \"1.0.0\",\n        \"id\": \"execModeBoth\",\n        \"title\": \"Execution Mode Test (Both)\",\n        \"description\": \"Supports both sync and async execution\",\n        \"jobControlOptions\": [\"sync-execute\", \"async-execute\"],\n        \"outputTransmission\": [\"value\"]\n    },\n    \"host\": {\n        \"type\": \"subprocess\"\n    },\n    \"command\": [\"bash\", \"-c\", \"sleep 2 && echo '{\\\"plugin_results\\\": \\\"done\\\"}'\" ],\n    \"config\": {\n        \"maxResources\": {\n            \"cpus\": 0.5,\n            \"memory\": 256\n        }\n    },\n    \"inputs\": [],\n    \"outputs\": []\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{url}}/processes/execModeBoth",
+											"host": [
+												"{{url}}"
+											],
+											"path": [
+												"processes",
+												"execModeBoth"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "register-sync-only-process",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"pm.test('Process registered successfully', function () {",
+													"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"info\": {\n        \"version\": \"1.0.0\",\n        \"id\": \"execModeSyncOnly\",\n        \"title\": \"Execution Mode Test (Sync Only)\",\n        \"description\": \"Supports only sync execution\",\n        \"jobControlOptions\": [\"sync-execute\"],\n        \"outputTransmission\": [\"value\"]\n    },\n    \"host\": {\n        \"type\": \"subprocess\"\n    },\n    \"command\": [\"bash\", \"-c\", \"sleep 2 && echo '{\\\"plugin_results\\\": \\\"done\\\"}'\" ],\n    \"config\": {\n        \"maxResources\": {\n            \"cpus\": 0.5,\n            \"memory\": 256\n        }\n    },\n    \"inputs\": [],\n    \"outputs\": []\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{url}}/processes/execModeSyncOnly",
+											"host": [
+												"{{url}}"
+											],
+											"path": [
+												"processes",
+												"execModeSyncOnly"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "register-async-only-process",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"pm.test('Process registered successfully', function () {",
+													"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"info\": {\n        \"version\": \"1.0.0\",\n        \"id\": \"execModeAsyncOnly\",\n        \"title\": \"Execution Mode Test (Async Only)\",\n        \"description\": \"Supports only async execution\",\n        \"jobControlOptions\": [\"async-execute\"],\n        \"outputTransmission\": [\"value\"]\n    },\n    \"host\": {\n        \"type\": \"subprocess\"\n    },\n    \"command\": [\"bash\", \"-c\", \"sleep 2 && echo '{\\\"plugin_results\\\": \\\"done\\\"}'\" ],\n    \"config\": {\n        \"maxResources\": {\n            \"cpus\": 0.5,\n            \"memory\": 256\n        }\n    },\n    \"inputs\": [],\n    \"outputs\": []\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{url}}/processes/execModeAsyncOnly",
+											"host": [
+												"{{url}}"
+											],
+											"path": [
+												"processes",
+												"execModeAsyncOnly"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						},
+						{
+							"name": "req25-no-prefer-header",
+							"item": [
+								{
+									"name": "Req25A-async-only-no-prefer",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"// Req 25A: async-only process without Prefer header -> async",
+													"pm.test('Async response (201) for async-only process', function () {",
+													"    pm.response.to.have.status(201);",
+													"});",
+													"",
+													"pm.test('Job status is accepted', function () {",
+													"    var resp = pm.response.json();",
+													"    pm.expect(resp.status).to.eql('accepted');",
+													"});",
+													"",
+													"pm.test('No Preference-Applied header (no preference was requested)', function () {",
+													"    pm.expect(pm.response.headers.has('Preference-Applied')).to.be.false;",
+													"});",
+													"",
+													"var resp = pm.response.json();",
+													"pm.collectionVariables.set('execModeJobID', resp.jobID);"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"inputs\": {}\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{url}}/processes/execModeAsyncOnly/execution",
+											"host": [
+												"{{url}}"
+											],
+											"path": [
+												"processes",
+												"execModeAsyncOnly",
+												"execution"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "dismiss-job-25A",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"pm.test('Job dismissed', function () {",
+													"    pm.response.to.have.status(200);",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "DELETE",
+										"header": [],
+										"url": {
+											"raw": "{{url}}/jobs/{{execModeJobID}}",
+											"host": [
+												"{{url}}"
+											],
+											"path": [
+												"jobs",
+												"{{execModeJobID}}"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Req25B-sync-only-no-prefer",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"// Req 25B: sync-only process without Prefer header -> sync",
+													"pm.test('Sync response (200) for sync-only process', function () {",
+													"    pm.response.to.have.status(200);",
+													"});",
+													"",
+													"pm.test('Job completed successfully', function () {",
+													"    var resp = pm.response.json();",
+													"    pm.expect(resp.status).to.eql('successful');",
+													"});",
+													"",
+													"pm.test('No Preference-Applied header', function () {",
+													"    pm.expect(pm.response.headers.has('Preference-Applied')).to.be.false;",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"inputs\": {}\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{url}}/processes/execModeSyncOnly/execution",
+											"host": [
+												"{{url}}"
+											],
+											"path": [
+												"processes",
+												"execModeSyncOnly",
+												"execution"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Req25C-both-modes-no-prefer",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"// Req 25C: both modes without Prefer header -> sync (default)",
+													"pm.test('Sync response (200) when both modes available and no preference', function () {",
+													"    pm.response.to.have.status(200);",
+													"});",
+													"",
+													"pm.test('Job completed successfully', function () {",
+													"    var resp = pm.response.json();",
+													"    pm.expect(resp.status).to.eql('successful');",
+													"});",
+													"",
+													"pm.test('No Preference-Applied header', function () {",
+													"    pm.expect(pm.response.headers.has('Preference-Applied')).to.be.false;",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"inputs\": {}\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{url}}/processes/execModeBoth/execution",
+											"host": [
+												"{{url}}"
+											],
+											"path": [
+												"processes",
+												"execModeBoth",
+												"execution"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"description": "OGC Requirement 25: Default execution mode when no Prefer header is present"
+						},
+						{
+							"name": "req26-with-prefer-async",
+							"item": [
+								{
+									"name": "Req26A-async-only-prefer-async",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"// Req 26A: async-only process with Prefer: respond-async -> async",
+													"pm.test('Async response (201) for async-only process', function () {",
+													"    pm.response.to.have.status(201);",
+													"});",
+													"",
+													"pm.test('Job status is accepted', function () {",
+													"    var resp = pm.response.json();",
+													"    pm.expect(resp.status).to.eql('accepted');",
+													"});",
+													"",
+													"pm.test('No Preference-Applied (process only supports async anyway)', function () {",
+													"    pm.expect(pm.response.headers.has('Preference-Applied')).to.be.false;",
+													"});",
+													"",
+													"var resp = pm.response.json();",
+													"pm.collectionVariables.set('execModeJobID', resp.jobID);"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "Prefer",
+												"value": "respond-async"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"inputs\": {}\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{url}}/processes/execModeAsyncOnly/execution",
+											"host": [
+												"{{url}}"
+											],
+											"path": [
+												"processes",
+												"execModeAsyncOnly",
+												"execution"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "dismiss-job-26A",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"pm.test('Job dismissed', function () {",
+													"    pm.response.to.have.status(200);",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "DELETE",
+										"header": [],
+										"url": {
+											"raw": "{{url}}/jobs/{{execModeJobID}}",
+											"host": [
+												"{{url}}"
+											],
+											"path": [
+												"jobs",
+												"{{execModeJobID}}"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Req26B-sync-only-prefer-async",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"// Req 26B: sync-only process with Prefer: respond-async -> sync (ignore preference)",
+													"pm.test('Sync response (200) - preference ignored for sync-only process', function () {",
+													"    pm.response.to.have.status(200);",
+													"});",
+													"",
+													"pm.test('Job completed successfully', function () {",
+													"    var resp = pm.response.json();",
+													"    pm.expect(resp.status).to.eql('successful');",
+													"});",
+													"",
+													"pm.test('No Preference-Applied header (preference was not honored)', function () {",
+													"    pm.expect(pm.response.headers.has('Preference-Applied')).to.be.false;",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "Prefer",
+												"value": "respond-async"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"inputs\": {}\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{url}}/processes/execModeSyncOnly/execution",
+											"host": [
+												"{{url}}"
+											],
+											"path": [
+												"processes",
+												"execModeSyncOnly",
+												"execution"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Req26C-Rec12A-both-modes-prefer-async",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"// Req 26C + Rec 12A: both modes with Prefer: respond-async -> async (honor preference)",
+													"pm.test('Async response (201) when preference is honored', function () {",
+													"    pm.response.to.have.status(201);",
+													"});",
+													"",
+													"pm.test('Job status is accepted', function () {",
+													"    var resp = pm.response.json();",
+													"    pm.expect(resp.status).to.eql('accepted');",
+													"});",
+													"",
+													"pm.test('Preference-Applied header is set (Rec 14)', function () {",
+													"    pm.expect(pm.response.headers.has('Preference-Applied')).to.be.true;",
+													"    pm.expect(pm.response.headers.get('Preference-Applied')).to.eql('respond-async');",
+													"});",
+													"",
+													"var resp = pm.response.json();",
+													"pm.collectionVariables.set('execModeJobID', resp.jobID);"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "POST",
+										"header": [
+											{
+												"key": "Prefer",
+												"value": "respond-async"
+											}
+										],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"inputs\": {}\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "{{url}}/processes/execModeBoth/execution",
+											"host": [
+												"{{url}}"
+											],
+											"path": [
+												"processes",
+												"execModeBoth",
+												"execution"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "dismiss-job-26C",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"pm.test('Job dismissed', function () {",
+													"    pm.response.to.have.status(200);",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "DELETE",
+										"header": [],
+										"url": {
+											"raw": "{{url}}/jobs/{{execModeJobID}}",
+											"host": [
+												"{{url}}"
+											],
+											"path": [
+												"jobs",
+												"{{execModeJobID}}"
+											]
+										}
+									},
+									"response": []
+								}
+							],
+							"description": "OGC Requirement 26: Execution mode when Prefer: respond-async header is present"
+						},
+						{
+							"name": "cleanup",
+							"item": [
+								{
+									"name": "delete-both-modes-process",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"pm.test('Process deleted successfully', function () {",
+													"    pm.response.to.have.status(200);",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "DELETE",
+										"header": [],
+										"url": {
+											"raw": "{{url}}/processes/execModeBoth",
+											"host": [
+												"{{url}}"
+											],
+											"path": [
+												"processes",
+												"execModeBoth"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "delete-sync-only-process",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"pm.test('Process deleted successfully', function () {",
+													"    pm.response.to.have.status(200);",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "DELETE",
+										"header": [],
+										"url": {
+											"raw": "{{url}}/processes/execModeSyncOnly",
+											"host": [
+												"{{url}}"
+											],
+											"path": [
+												"processes",
+												"execModeSyncOnly"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "delete-async-only-process",
+									"event": [
+										{
+											"listen": "test",
+											"script": {
+												"exec": [
+													"pm.test('Process deleted successfully', function () {",
+													"    pm.response.to.have.status(200);",
+													"});"
+												],
+												"type": "text/javascript"
+											}
+										}
+									],
+									"request": {
+										"method": "DELETE",
+										"header": [],
+										"url": {
+											"raw": "{{url}}/processes/execModeAsyncOnly",
+											"host": [
+												"{{url}}"
+											],
+											"path": [
+												"processes",
+												"execModeAsyncOnly"
+											]
+										}
+									},
+									"response": []
+								}
+							]
+						}
+					],
+					"description": "Tests for OGC API - Processes execution mode selection (Requirements 25/26, Recommendation 12A/14)"
 				}
 			]
 		},
@@ -1902,7 +2567,7 @@
 											"const jobsData = pm.response.json().jobs;",
 											"",
 											"pm.test(\"number of jobs in record test\", function () {",
-											"    pm.expect(jobsData.length).to.eql(5);",
+											"    pm.expect(jobsData.length).to.eql(11);",
 											"    });"
 										],
 										"type": "text/javascript",
@@ -2167,7 +2832,7 @@
 					"name": "setup",
 					"item": [
 						{
-							"name": "register-sleeper-async-process",
+							"name": "register-sleeper-process",
 							"event": [
 								{
 									"listen": "test",
@@ -2186,7 +2851,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"info\": {\n        \"version\": \"1.0.0\",\n        \"id\": \"sleeperAsync\",\n        \"title\": \"Sleeper Async Test Process\",\n        \"description\": \"A test process that sleeps for 10 seconds (async)\",\n        \"jobControlOptions\": [\"async-execute\"],\n        \"outputTransmission\": [\"value\"]\n    },\n    \"host\": {\n        \"type\": \"subprocess\"\n    },\n    \"command\": [\"bash\", \"-c\", \"sleep 10 && echo '{\\\"plugin_results\\\": \\\"slept for 10 seconds!\\\"}'\" ],\n    \"config\": {\n        \"maxResources\": {\n            \"cpus\": 4.0,\n            \"memory\": 4096\n        }\n    },\n    \"inputs\": [],\n    \"outputs\": []\n}",
+									"raw": "{\n    \"info\": {\n        \"version\": \"1.0.0\",\n        \"id\": \"sleeperScheduler\",\n        \"title\": \"Sleeper Scheduler Test\",\n        \"description\": \"A test process for scheduler resource contention (supports both sync and async)\",\n        \"jobControlOptions\": [\"sync-execute\", \"async-execute\"],\n        \"outputTransmission\": [\"value\"]\n    },\n    \"host\": {\n        \"type\": \"subprocess\"\n    },\n    \"command\": [\"bash\", \"-c\", \"sleep 10 && echo '{\\\"plugin_results\\\": \\\"slept for 10 seconds!\\\"}'\" ],\n    \"config\": {\n        \"maxResources\": {\n            \"cpus\": 4.0,\n            \"memory\": 4096\n        }\n    },\n    \"inputs\": [],\n    \"outputs\": []\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -2194,53 +2859,13 @@
 									}
 								},
 								"url": {
-									"raw": "{{url}}/processes/sleeperAsync",
+									"raw": "{{url}}/processes/sleeperScheduler",
 									"host": [
 										"{{url}}"
 									],
 									"path": [
 										"processes",
-										"sleeperAsync"
-									]
-								}
-							},
-							"response": []
-						},
-						{
-							"name": "register-sleeper-sync-process",
-							"event": [
-								{
-									"listen": "test",
-									"script": {
-										"exec": [
-											"pm.test('Process registered successfully', function () {",
-											"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
-											"});"
-										],
-										"type": "text/javascript"
-									}
-								}
-							],
-							"request": {
-								"method": "POST",
-								"header": [],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n    \"info\": {\n        \"version\": \"1.0.0\",\n        \"id\": \"sleeperSync\",\n        \"title\": \"Sleeper Sync Test Process\",\n        \"description\": \"A test process that sleeps for 10 seconds (sync)\",\n        \"jobControlOptions\": [\"sync-execute\"],\n        \"outputTransmission\": [\"value\"]\n    },\n    \"host\": {\n        \"type\": \"subprocess\"\n    },\n    \"command\": [\"bash\", \"-c\", \"sleep 10 && echo '{\\\"plugin_results\\\": \\\"slept for 10 seconds!\\\"}'\" ],\n    \"config\": {\n        \"maxResources\": {\n            \"cpus\": 4.0,\n            \"memory\": 4096\n        }\n    },\n    \"inputs\": [],\n    \"outputs\": []\n}",
-									"options": {
-										"raw": {
-											"language": "json"
-										}
-									}
-								},
-								"url": {
-									"raw": "{{url}}/processes/sleeperSync",
-									"host": [
-										"{{url}}"
-									],
-									"path": [
-										"processes",
-										"sleeperSync"
+										"sleeperScheduler"
 									]
 								}
 							},
@@ -2260,6 +2885,10 @@
 										"exec": [
 											"pm.test('Status code is 201', function () {",
 											"    pm.response.to.have.status(201);",
+											"});",
+											"",
+											"pm.test('Preference-Applied header is set', function () {",
+											"    pm.expect(pm.response.headers.get('Preference-Applied')).to.eql('respond-async');",
 											"});",
 											"",
 											"var resp = pm.response.json();",
@@ -2287,13 +2916,13 @@
 									}
 								},
 								"url": {
-									"raw": "{{url}}/processes/sleeperAsync/execution",
+									"raw": "{{url}}/processes/sleeperScheduler/execution",
 									"host": [
 										"{{url}}"
 									],
 									"path": [
 										"processes",
-										"sleeperAsync",
+										"sleeperScheduler",
 										"execution"
 									]
 								}
@@ -2370,13 +2999,13 @@
 									}
 								},
 								"url": {
-									"raw": "{{url}}/processes/sleeperSync/execution",
+									"raw": "{{url}}/processes/sleeperScheduler/execution",
 									"host": [
 										"{{url}}"
 									],
 									"path": [
 										"processes",
-										"sleeperSync",
+										"sleeperScheduler",
 										"execution"
 									]
 								}
@@ -2430,13 +3059,13 @@
 									}
 								},
 								"url": {
-									"raw": "{{url}}/processes/sleeperSync/execution",
+									"raw": "{{url}}/processes/sleeperScheduler/execution",
 									"host": [
 										"{{url}}"
 									],
 									"path": [
 										"processes",
-										"sleeperSync",
+										"sleeperScheduler",
 										"execution"
 									]
 								}
@@ -2449,7 +3078,7 @@
 					"name": "cleanup",
 					"item": [
 						{
-							"name": "delete-sleeper-async",
+							"name": "delete-sleeper-scheduler",
 							"event": [
 								{
 									"listen": "test",
@@ -2467,44 +3096,13 @@
 								"method": "DELETE",
 								"header": [],
 								"url": {
-									"raw": "{{url}}/processes/sleeperAsync",
+									"raw": "{{url}}/processes/sleeperScheduler",
 									"host": [
 										"{{url}}"
 									],
 									"path": [
 										"processes",
-										"sleeperAsync"
-									]
-								}
-							},
-							"response": []
-						},
-						{
-							"name": "delete-sleeper-sync",
-							"event": [
-								{
-									"listen": "test",
-									"script": {
-										"exec": [
-											"pm.test('Process deleted successfully', function () {",
-											"    pm.response.to.have.status(200);",
-											"});"
-										],
-										"type": "text/javascript"
-									}
-								}
-							],
-							"request": {
-								"method": "DELETE",
-								"header": [],
-								"url": {
-									"raw": "{{url}}/processes/sleeperSync",
-									"host": [
-										"{{url}}"
-									],
-									"path": [
-										"processes",
-										"sleeperSync"
+										"sleeperScheduler"
 									]
 								}
 							},
@@ -2552,6 +3150,10 @@
 		},
 		{
 			"key": "sleeperJobID",
+			"value": ""
+		},
+		{
+			"key": "execModeJobID",
 			"value": ""
 		},
 		{
