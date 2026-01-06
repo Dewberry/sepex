@@ -2,6 +2,9 @@ package jobs
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"app/controllers"
@@ -84,4 +87,53 @@ func RecoverDockerJobs(
 	}
 
 	return nil
+}
+
+// DismissStaleSubprocessJobs marks any non-terminal subprocess job as DISMISSED
+// and writes a server log line explaining it was dismissed due to API restart/crash.
+func DismissStaleSubprocessJobs(db Database) error {
+	records, err := db.GetNonTerminalJobs()
+	if err != nil {
+		return err
+	}
+
+	for _, r := range records {
+		if r.Host != "subprocess" {
+			continue
+		}
+
+		// Mark dismissed
+		_ = db.updateJobRecord(r.JobID, DISMISSED, time.Now())
+
+		// Write explanatory line to server logs (best-effort)
+		if err := appendDismissedDueToRestartLog(r.JobID); err != nil {
+			log.Warnf("failed to append restart dismissal log for job %s: %v", r.JobID, err)
+		}
+
+		log.Warnf("Dismissed subprocess job %s due to API restart/crash", r.JobID)
+	}
+
+	return nil
+}
+
+func appendDismissedDueToRestartLog(jobID string) error {
+	dir := os.Getenv("TMP_JOB_LOGS_DIR")
+
+	fp := filepath.Join(dir, fmt.Sprintf("%s.server.jsonl", jobID))
+
+	f, err := os.OpenFile(fp, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// Keep it simple: one JSON line. Your UI already parses JSONL from these files.
+	line := fmt.Sprintf(
+		`{"time":"%s","level":"WARN","message":"Job dismissed due to API restart/crash (subprocess jobs are not recoverable)."}%s`,
+		time.Now().UTC().Format(time.RFC3339Nano),
+		"\n",
+	)
+
+	_, err = f.WriteString(line)
+	return err
 }

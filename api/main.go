@@ -276,6 +276,10 @@ func main() {
 		log.Errorf("docker recovery failed: %v", err)
 	}
 
+	if err := jobs.DismissStaleSubprocessJobs(rh.DB); err != nil {
+		log.Errorf("failed dismissing stale subprocess jobs: %v", err)
+	}
+
 	// Goroutines
 	go rh.StatusUpdateRoutine()
 	go rh.JobCompletionRoutine()
