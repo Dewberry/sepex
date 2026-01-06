@@ -479,11 +479,34 @@ func (j *AWSBatchJob) RunFinished() {
 	j.wgRun.Done()
 }
 
+func (j *AWSBatchJob) isRecovered() bool {
+	return j.ctxCancel == nil
+}
+func (j *AWSBatchJob) CloseRecovered() {
+	// fetch logs once
+	_ = j.UpdateProcessLogs()
+
+	// mark job done
+	if j.DoneChan != nil {
+		j.DoneChan <- j
+	}
+
+	// upload logs
+	if j.StorageSvc != nil {
+		UploadLogsToStorage(j.StorageSvc, j.UUID, j.ProcessName)
+	}
+
+	log.Infof("Recovered AWS Batch job %s finalized", j.UUID)
+}
+
 // Write final logs, cancelCtx, write metadata
 func (j *AWSBatchJob) Close() {
 	// to do: add panic recover to remove job from active jobs even if following panics
+	if j.isRecovered() {
+		j.CloseRecovered()
+		return
+	}
 	j.ctxCancel()
-
 	const maxAttempts = 5
 
 	for i := 1; i <= maxAttempts; i++ {

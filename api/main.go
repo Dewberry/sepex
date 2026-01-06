@@ -280,6 +280,16 @@ func main() {
 		log.Errorf("failed dismissing stale subprocess jobs: %v", err)
 	}
 
+	err = jobs.RecoverAWSBatchJobs(
+		rh.DB,
+		rh.StorageSvc,
+		rh.ActiveJobs,
+		rh.MessageQueue.JobDone,
+	)
+	if err != nil {
+		log.Errorf("aws batch recovery failed: %v", err)
+	}
+
 	// Goroutines
 	go rh.StatusUpdateRoutine()
 	go rh.JobCompletionRoutine()

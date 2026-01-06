@@ -137,3 +137,77 @@ func appendDismissedDueToRestartLog(jobID string) error {
 	_, err = f.WriteString(line)
 	return err
 }
+
+func RecoverAWSBatchJobs(
+	db Database,
+	storage *s3.S3,
+	active *ActiveJobs,
+	doneChan chan Job,
+) error {
+	records, err := db.GetNonTerminalJobs()
+	if err != nil {
+		return err
+	}
+
+	batchCtl, err := controllers.NewAWSBatchController(
+		os.Getenv("AWS_ACCESS_KEY_ID"),
+		os.Getenv("AWS_SECRET_ACCESS_KEY"),
+		os.Getenv("AWS_REGION"),
+	)
+	if err != nil {
+		return err
+	}
+
+	for _, r := range records {
+		if r.Host != "aws-batch" || r.HostJobID == "" {
+			continue
+		}
+
+		log.Infof("Recovering AWS Batch job %s (%s)", r.JobID, r.HostJobID)
+
+		status, logStream, err := batchCtl.JobMonitor(r.HostJobID)
+		if err != nil {
+			log.Errorf("AWS batch job missing: %s", r.HostJobID)
+			db.updateJobRecord(r.JobID, LOST, time.Now())
+			continue
+		}
+
+		// Rebuild the in-memory job
+		j := &AWSBatchJob{
+			UUID:          r.JobID,
+			AWSBatchID:    r.HostJobID,
+			ProcessName:   r.ProcessID,
+			Status:        r.Status,
+			UpdateTime:    r.LastUpdate,
+			logStreamName: logStream,
+			batchContext:  batchCtl,
+			DB:            db,
+			StorageSvc:    storage,
+			DoneChan:      doneChan,
+		}
+
+		j.initLogger()
+
+		var job Job = j
+		active.Jobs[j.JobID()] = &job
+
+		switch status {
+		case "RUNNING":
+			j.NewStatusUpdate(RUNNING, time.Now())
+
+		case "SUCCEEDED":
+			j.NewStatusUpdate(SUCCESSFUL, time.Now())
+			go j.Close()
+
+		case "FAILED":
+			j.NewStatusUpdate(FAILED, time.Now())
+			go j.Close()
+
+		case "DISMISSED":
+			j.NewStatusUpdate(DISMISSED, time.Now())
+			go j.Close()
+		}
+	}
+
+	return nil
+}
