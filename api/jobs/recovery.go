@@ -211,3 +211,25 @@ func RecoverAWSBatchJobs(
 
 	return nil
 }
+
+func RecoverAllJobs(
+	db Database,
+	storage *s3.S3,
+	active *ActiveJobs,
+	doneChan chan Job,
+) error {
+
+	if err := RecoverDockerJobs(db, storage, active, doneChan); err != nil {
+		return fmt.Errorf("docker: %w", err)
+	}
+
+	if err := DismissStaleSubprocessJobs(db); err != nil {
+		return fmt.Errorf("subprocess dismiss: %w", err)
+	}
+
+	if err := RecoverAWSBatchJobs(db, storage, active, doneChan); err != nil {
+		return fmt.Errorf("aws-batch: %w", err)
+	}
+
+	return nil
+}
