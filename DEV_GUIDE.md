@@ -15,10 +15,10 @@
 
 ## Auth
 - If auth is enabled some or all routes are protected based on env variable `AUTH_LEVEL` settings.
-- The middleware validate and parse JWT to verify `X-ProcessAPI-User-Email` header and inject `X-ProcessAPI-User-Roles` header.
+- The middleware validate and parse JWT to verify `X-SEPEX-User-Email` header and inject `X-SEPEX-User-Roles` header.
 - A user can use tools like Postman to set these headers themselves, but if auth is enabled, they will be checked against the token. This setup allows adding submitter info to the database when auth is not enabled.
-- If auth is enabled `X-ProcessAPI-User-Email` header is mandatory.
-- Requests from Service Role will not be verified for `X-ProcessAPI-User-Email`.
+- If auth is enabled `X-SEPEX-User-Email` header is mandatory.
+- Requests from Service Role will not be verified for `X-SEPEX-User-Email`.
 - Only service_accounts can post callbacks
 - Requests from Admin Role are allowed to execute all processes, non-admins must have the role with same name as `processID` to execute that process.
 - Requests from Admin Role are allowed to retrieve all jobs information, non admins can only retrieve information for jobs that they submitted.
@@ -29,6 +29,18 @@
 
 ## Scope
 - The behavior of logging is unknown for AWS Batch processes with job definitions having number of attempts more than 1.
+
+## Local-Scheduler
+
+
+## Local Scheduler
+
+**Design decisions:**
+
+1. ResourceLimits calculated once at startup from flags/env vars. Dynamic reconfiguration rejected because a queued job could block forever if limits are reduced below its requirements after it was already validated and enqueued.
+
+1. ResourcePool and PendingJobs use `sync.Mutex`. Channels add complexity without benefit for simple state. Go channels use internal mutexes anyway, so performance is similar.
+
 
 ## Release/Versioning/Changelog
 

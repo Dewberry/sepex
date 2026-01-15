@@ -40,6 +40,8 @@ var (
 	logFile        string
 	authSvc        string
 	authLvl        string
+	maxLocalCPUs   string
+	maxLocalMemory string
 )
 
 func init() {
@@ -67,6 +69,8 @@ func init() {
 	flag.StringVar(&logFile, "lf", resolveValue("LOG_FILE", "/.data/logs/api.jsonl"), "specify the log file")
 	flag.StringVar(&authSvc, "au", resolveValue("AUTH_SERVICE", ""), "specify the auth service")
 	flag.StringVar(&authLvl, "al", resolveValue("AUTH_LEVEL", "0"), "specify the authorization striction level")
+	flag.StringVar(&maxLocalCPUs, "mlc", resolveValue("MAX_LOCAL_CPUS", ""), "max CPUs for local jobs (default: 80% of system CPUs)")
+	flag.StringVar(&maxLocalMemory, "mlm", resolveValue("MAX_LOCAL_MEMORY_MB", ""), "max memory in MB for local jobs (default: 8192)")
 
 	flag.Parse()
 }
@@ -260,8 +264,7 @@ func main() {
 	initPlugins()
 
 	// Initialize resources
-	rh := handlers.NewRESTHander(GitTag)
-
+	rh := handlers.NewRESTHander(GitTag, maxLocalCPUs, maxLocalMemory)
 	// todo: handle this error: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running
 	// todo: all non terminated job statuses should be updated to unknown
 	// todo: all logs in the logs directory should be moved to storage
@@ -277,6 +280,7 @@ func main() {
 	// Goroutines
 	go rh.StatusUpdateRoutine()
 	go rh.JobCompletionRoutine()
+	rh.QueueWorker.Start() // Start() spawns its own goroutine and supports Stop() for graceful shutdown
 
 	// Set server configuration
 	e := echo.New()
@@ -326,6 +330,9 @@ func main() {
 	pg.PUT("/jobs/:jobID/status", rh.JobStatusUpdateHandler)
 	// e.POST("/jobs/:jobID/results", rh.JobResultsUpdateHandler)
 
+	// Admin
+	e.GET("/admin/resources", rh.ResourceStatusHandler)
+
 	_, lw := initLogger()
 	fmt.Println("Logging to", logFile)
 	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
@@ -359,7 +366,11 @@ func main() {
 	// Shutdown the server
 	// By default, Docker provides a grace period of 10 seconds with the docker stop command.
 
-	// Kill any running docker containers/subprocess (clean up resources)
+	// Stop QueueWorker from starting new jobs
+	rh.QueueWorker.Stop()
+
+	// Kill any running docker containers / subprocesses (clean up resources)
+	// Kill all active jobs
 	// Send dismiss notice to all cloud jobs
 	rh.ActiveJobs.KillAll()
 	log.Info("kill command sent to all active jobs")

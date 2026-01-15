@@ -65,6 +65,16 @@ type Job interface {
 	// Pefrom any cleanup such as cancelling context etc
 	// It is the responsibility of whoever is updating the terminated status to also call Close()
 	Close()
+
+	// GetResources returns the CPU and memory resources for this job
+	GetResources() Resources
+
+	// Run executes the job. Called by QueueWorker in a goroutine for Pending Jobs.
+	// Called by handler for sync jobs
+	Run()
+
+	// IsSyncJob returns true if this is a synchronous job
+	IsSyncJob() bool
 }
 
 // JobRecord contains details about a job
