@@ -146,13 +146,11 @@ const (
 
 // FetchResults by parsing logs
 // Assumes last log will be results always
-var ErrNoResults = fmt.Errorf("no results available")
-
 func FetchResults(svc *s3.S3, jid string, status string) (interface{}, error) {
 
 	// LOST jobs never have results
 	if status == LOST {
-		return nil, ErrNoResults
+		return nil, fmt.Errorf("no results available")
 	}
 
 	// Only successful jobs can have results
@@ -166,16 +164,19 @@ func FetchResults(svc *s3.S3, jid string, status string) (interface{}, error) {
 	}
 
 	processLogs := logs.ProcessLogs
-	if len(processLogs) == 0 {
-		return nil, ErrNoResults
+	lastLogIdx := len(processLogs) - 1
+	if lastLogIdx < 0 {
+		return nil, fmt.Errorf("no process logs available")
 	}
 
-	lastLog := processLogs[len(processLogs)-1]
-	lastLogMsg := strings.ReplaceAll(lastLog.Msg, "'", "\"")
+	lastLog := processLogs[lastLogIdx]
+	lastLogMsg := lastLog.Msg
+	lastLogMsg = strings.ReplaceAll(lastLogMsg, "'", "\"")
 
 	var data map[string]interface{}
-	if err := json.Unmarshal([]byte(lastLogMsg), &data); err != nil {
-		return nil, fmt.Errorf("unable to parse results JSON: %w", err)
+	err = json.Unmarshal([]byte(lastLogMsg), &data)
+	if err != nil {
+		return nil, fmt.Errorf(`unable to parse results, expected {"plugin_results": {....}}, found : %s. Error: %s`, lastLog, err.Error())
 	}
 
 	pluginResults, ok := data["plugin_results"]
@@ -277,16 +278,13 @@ func FetchLogs(svc *s3.S3, jid string, status string, onlyContainer bool) (JobLo
 		if err != nil {
 			return JobLogs{}, err
 		}
-
 		if !exists {
 			return JobLogs{}, fmt.Errorf("%s log file not found on storage", k.key)
 		}
-
 		logs, err := utils.GetS3LinesData(storageKey, svc)
 		if err != nil {
 			return JobLogs{}, fmt.Errorf("failed to read %s logs from storage: %v", k.key, err)
 		}
-
 		structuredLogs := DecodeLogStrings(logs)
 		*k.target = structuredLogs
 	}
