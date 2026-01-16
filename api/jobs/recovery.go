@@ -10,7 +10,7 @@ import (
 	"app/controllers"
 
 	"github.com/aws/aws-sdk-go/service/s3"
-	log "github.com/sirupsen/logrus"
+	"github.com/labstack/gommon/log"
 )
 
 func recoverRunningContainer(j *DockerJob, dockerCtl *controllers.DockerController) {
@@ -107,10 +107,10 @@ func DismissStaleSubprocessJobs(db Database) error {
 
 		// Write explanatory line to server logs (best-effort)
 		if err := appendDismissedDueToRestartLog(r.JobID); err != nil {
-			log.Warnf("failed to append restart dismissal log for job %s: %v", r.JobID, err)
+			log.Warn("failed to append restart dismissal log for job ", r.JobID, ": ", err)
 		}
 
-		log.Warnf("Dismissed subprocess job %s due to API restart/crash", r.JobID)
+		log.Warn("Dismissed subprocess job ", r.JobID, " due to API restart/crash")
 	}
 
 	return nil
@@ -127,9 +127,8 @@ func appendDismissedDueToRestartLog(jobID string) error {
 	}
 	defer f.Close()
 
-	// Keep it simple: one JSON line. Your UI already parses JSONL from these files.
 	line := fmt.Sprintf(
-		`{"time":"%s","level":"WARN","message":"Job dismissed due to API restart/crash (subprocess jobs are not recoverable)."}%s`,
+		`{"time":"%s","level":"WARN","msg":"Job dismissed due to API restart/crash (subprocess jobs are not recoverable)."}%s`,
 		time.Now().UTC().Format(time.RFC3339Nano),
 		"\n",
 	)
@@ -163,12 +162,12 @@ func RecoverAWSBatchJobs(
 			continue
 		}
 
-		log.Infof("Recovering AWS Batch job %s (%s)", r.JobID, r.HostJobID)
+		log.Info("Recovering AWS Batch job ", r.JobID, " (", r.HostJobID, ")")
 
 		status, logStream, err := batchCtl.JobMonitor(r.HostJobID)
 		if err != nil {
-			log.Errorf("AWS batch job missing: %s", r.HostJobID)
-			db.updateJobRecord(r.JobID, LOST, time.Now())
+			log.Error("AWS batch job missing: ", r.HostJobID)
+			_ = db.updateJobRecord(r.JobID, LOST, time.Now())
 			continue
 		}
 
