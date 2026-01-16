@@ -10,8 +10,132 @@ import (
 	"app/controllers"
 
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/labstack/gommon/log"
+	log "github.com/sirupsen/logrus"
 )
+
+// RecoverAllJobs rebuilds in-memory state after an API restart.
+//
+// Design:
+// - Query DB once for all non-terminal jobs.
+// - For each job:
+//   - docker: check container state and recover.
+//   - subprocess: not recoverable -> mark DISMISSED + write server log line.
+//   - aws-batch: query AWS for current state; if terminal -> finalize; if running -> add to ActiveJobs.
+//
+// Notes:
+// - "Recovery" here is about the API state (ActiveJobs + status) after a crash/restart.
+// - This does NOT mean subprocess jobs continue running; those are dismissed by design.
+func RecoverAllJobs(
+	db Database,
+	storage *s3.S3,
+	active *ActiveJobs,
+	doneChan chan Job,
+) error {
+
+	records, err := db.GetNonTerminalJobs()
+	if err != nil {
+		return err
+	}
+
+	// Count by host
+	var dockerCount, subprocessCount, batchCount int
+	for _, r := range records {
+		switch r.Host {
+		case "docker":
+			dockerCount++
+		case "subprocess":
+			subprocessCount++
+		case "aws-batch":
+			batchCount++
+		}
+	}
+
+	log.Infof("Recovery: found %d non-terminal jobs (docker=%d subprocess=%d aws-batch=%d)",
+		len(records), dockerCount, subprocessCount, batchCount,
+	)
+
+	// Run recoveries in a stable order.
+	if err := recoverDockerJobsFromRecords(db, storage, active, doneChan, records); err != nil {
+		return fmt.Errorf("docker recovery failed: %w", err)
+	}
+
+	if err := dismissSubprocessJobsFromRecords(db, records); err != nil {
+		return fmt.Errorf("subprocess dismissal failed: %w", err)
+	}
+
+	if err := recoverAWSBatchJobsFromRecords(db, storage, active, doneChan, records); err != nil {
+		return fmt.Errorf("aws-batch recovery failed: %w", err)
+	}
+
+	log.Info("Recovery: completed")
+	return nil
+}
+
+// ---------------------------
+// Docker recovery
+// ---------------------------
+
+func recoverDockerJobsFromRecords(
+	db Database,
+	storageSvc *s3.S3,
+	activeJobs *ActiveJobs,
+	doneChan chan Job,
+	records []JobRecord,
+) error {
+
+	dockerCtl, err := controllers.NewDockerController()
+	if err != nil {
+		return err
+	}
+
+	for _, r := range records {
+		if r.Host != "docker" || r.HostJobID == "" {
+			continue
+		}
+
+		log.Infof("Recovery(docker): job=%s container=%s status=%s", r.JobID, r.HostJobID, r.Status)
+
+		info, err := dockerCtl.ContainerInfo(context.TODO(), r.HostJobID)
+		if err != nil || !info.Exists {
+			log.Warnf("Recovery(docker): container missing -> marking LOST job=%s container=%s", r.JobID, r.HostJobID)
+			_ = db.updateJobRecord(r.JobID, LOST, time.Now())
+			continue
+		}
+
+		job := &DockerJob{
+			UUID:        r.JobID,
+			ContainerID: r.HostJobID,
+			ProcessName: r.ProcessID,
+			Status:      RUNNING,
+			DB:          db,
+			StorageSvc:  storageSvc,
+			DoneChan:    doneChan,
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
+		job.ctx = ctx
+		job.ctxCancel = cancel
+
+		if err := job.initLogger(); err != nil {
+			log.Warnf("Recovery(docker): failed to rebuild in-memory job=%s: %v", r.JobID, err)
+			continue
+		}
+
+		// Register in ActiveJobs
+		var j Job = job
+		activeJobs.Jobs[j.JobID()] = &j
+
+		log.Infof("Recovery(docker): added to ActiveJobs job=%s running=%v exit=%d", r.JobID, info.Running, info.ExitCode)
+
+		if info.Running {
+			go recoverRunningContainer(job, dockerCtl)
+		} else {
+			go recoverExitedContainer(job, info.ExitCode)
+		}
+	}
+
+	return nil
+}
 
 func recoverRunningContainer(j *DockerJob, dockerCtl *controllers.DockerController) {
 	exitCode, err := dockerCtl.ContainerWait(context.TODO(), j.ContainerID)
@@ -39,86 +163,35 @@ func recoverExitedContainer(j *DockerJob, exitCode int) {
 	j.Close()
 }
 
-func RecoverDockerJobs(
-	db Database,
-	storageSvc *s3.S3,
-	activeJobs *ActiveJobs,
-	doneChan chan Job,
-) error {
+// ---------------------------
+// Subprocess dismissal
+// ---------------------------
 
-	records, err := db.GetNonTerminalJobs()
-	if err != nil {
-		return err
-	}
-
-	dockerCtl, err := controllers.NewDockerController()
-	if err != nil {
-		return err
-	}
-
-	for _, r := range records {
-		if r.Host != "docker" || r.HostJobID == "" {
-			continue
-		}
-
-		log.Info("Recovering docker job ", r.JobID)
-
-		info, err := dockerCtl.ContainerInfo(context.TODO(), r.HostJobID)
-		if err != nil || !info.Exists {
-			_ = db.updateJobRecord(r.JobID, LOST, time.Now())
-			continue
-		}
-
-		job, err := NewRecoveredDockerJob(r, db, storageSvc, doneChan)
-		if err != nil {
-			log.Error("Failed recreating job ", r.JobID)
-			continue
-		}
-
-		// Register in ActiveJobs
-		var j Job = job
-		activeJobs.Jobs[j.JobID()] = &j
-
-		if info.Running {
-			go recoverRunningContainer(job, dockerCtl)
-		} else {
-			go recoverExitedContainer(job, info.ExitCode)
-		}
-	}
-
-	return nil
-}
-
-// DismissStaleSubprocessJobs marks any non-terminal subprocess job as DISMISSED
-// and writes a server log line explaining it was dismissed due to API restart/crash.
-func DismissStaleSubprocessJobs(db Database) error {
-	records, err := db.GetNonTerminalJobs()
-	if err != nil {
-		return err
-	}
-
+// dismissSubprocessJobsFromRecords marks any non-terminal subprocess job as DISMISSED
+// and appends a server log line explaining it was dismissed due to restart/crash.
+//
+// Subprocess jobs are intentionally not recoverable: after an API restart we cannot
+// reliably reconnect to the child process or guarantee its state.
+func dismissSubprocessJobsFromRecords(db Database, records []JobRecord) error {
 	for _, r := range records {
 		if r.Host != "subprocess" {
 			continue
 		}
 
-		// Mark dismissed
+		log.Warnf("Recovery(subprocess): dismissing job=%s prev_status=%s", r.JobID, r.Status)
+
 		_ = db.updateJobRecord(r.JobID, DISMISSED, time.Now())
 
-		// Write explanatory line to server logs (best-effort)
+		// Best-effort log line for UI visibility
 		if err := appendDismissedDueToRestartLog(r.JobID); err != nil {
-			log.Warn("failed to append restart dismissal log for job ", r.JobID, ": ", err)
+			log.Warnf("Recovery(subprocess): failed writing dismissal log job=%s: %v", r.JobID, err)
 		}
-
-		log.Warn("Dismissed subprocess job ", r.JobID, " due to API restart/crash")
 	}
-
 	return nil
 }
 
 func appendDismissedDueToRestartLog(jobID string) error {
 	dir := os.Getenv("TMP_JOB_LOGS_DIR")
-
 	fp := filepath.Join(dir, fmt.Sprintf("%s.server.jsonl", jobID))
 
 	f, err := os.OpenFile(fp, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -127,8 +200,9 @@ func appendDismissedDueToRestartLog(jobID string) error {
 	}
 	defer f.Close()
 
+	// Match LogEntry fields in jobs.go: Level, Msg, Time
 	line := fmt.Sprintf(
-		`{"time":"%s","level":"WARN","msg":"Job dismissed due to API restart/crash (subprocess jobs are not recoverable)."}%s`,
+		`{"time":"%s","level":"warning","msg":"Job dismissed due to API restart/crash (subprocess jobs are not recoverable)."}%s`,
 		time.Now().UTC().Format(time.RFC3339Nano),
 		"\n",
 	)
@@ -137,16 +211,17 @@ func appendDismissedDueToRestartLog(jobID string) error {
 	return err
 }
 
-func RecoverAWSBatchJobs(
+// ---------------------------
+// AWS Batch recovery
+// ---------------------------
+
+func recoverAWSBatchJobsFromRecords(
 	db Database,
 	storage *s3.S3,
 	active *ActiveJobs,
 	doneChan chan Job,
+	records []JobRecord,
 ) error {
-	records, err := db.GetNonTerminalJobs()
-	if err != nil {
-		return err
-	}
 
 	batchCtl, err := controllers.NewAWSBatchController(
 		os.Getenv("AWS_ACCESS_KEY_ID"),
@@ -162,16 +237,15 @@ func RecoverAWSBatchJobs(
 			continue
 		}
 
-		log.Info("Recovering AWS Batch job ", r.JobID, " (", r.HostJobID, ")")
+		log.Infof("Recovery(aws-batch): job=%s batch_id=%s status=%s", r.JobID, r.HostJobID, r.Status)
 
 		status, logStream, err := batchCtl.JobMonitor(r.HostJobID)
 		if err != nil {
-			log.Error("AWS batch job missing: ", r.HostJobID)
+			log.Warnf("Recovery(aws-batch): batch job missing -> marking LOST job=%s batch_id=%s", r.JobID, r.HostJobID)
 			_ = db.updateJobRecord(r.JobID, LOST, time.Now())
 			continue
 		}
 
-		// Rebuild the in-memory job
 		j := &AWSBatchJob{
 			UUID:          r.JobID,
 			AWSBatchID:    r.HostJobID,
@@ -185,14 +259,19 @@ func RecoverAWSBatchJobs(
 			DoneChan:      doneChan,
 		}
 
-		j.initLogger()
+		if err := j.initLogger(); err != nil {
+			log.Warnf("Recovery(aws-batch): failed to init logger job=%s: %v", r.JobID, err)
+			continue
+		}
 
 		var job Job = j
 		active.Jobs[j.JobID()] = &job
+		log.Infof("Recovery(aws-batch): added to ActiveJobs job=%s aws_status=%s", r.JobID, status)
 
 		switch status {
 		case "RUNNING":
 			j.NewStatusUpdate(RUNNING, time.Now())
+			// No watcher loop: system expects status updates to come via the status endpoint.
 
 		case "SUCCEEDED":
 			j.NewStatusUpdate(SUCCESSFUL, time.Now())
@@ -205,29 +284,10 @@ func RecoverAWSBatchJobs(
 		case "DISMISSED":
 			j.NewStatusUpdate(DISMISSED, time.Now())
 			go j.Close()
+
+		default:
+			log.Warnf("Recovery(aws-batch): unhandled aws status=%s job=%s", status, r.JobID)
 		}
-	}
-
-	return nil
-}
-
-func RecoverAllJobs(
-	db Database,
-	storage *s3.S3,
-	active *ActiveJobs,
-	doneChan chan Job,
-) error {
-
-	if err := RecoverDockerJobs(db, storage, active, doneChan); err != nil {
-		return fmt.Errorf("docker: %w", err)
-	}
-
-	if err := DismissStaleSubprocessJobs(db); err != nil {
-		return fmt.Errorf("subprocess dismiss: %w", err)
-	}
-
-	if err := RecoverAWSBatchJobs(db, storage, active, doneChan); err != nil {
-		return fmt.Errorf("aws-batch: %w", err)
 	}
 
 	return nil
