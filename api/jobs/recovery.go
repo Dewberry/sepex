@@ -19,12 +19,9 @@ import (
 // - Query DB once for all non-terminal jobs.
 // - For each job:
 //   - docker: check container state and recover.
-//   - subprocess: not recoverable -> mark DISMISSED + write server log line.
-//   - aws-batch: query AWS for current state; if terminal -> finalize; if running -> add to ActiveJobs.
-//
-// Notes:
-// - "Recovery" here is about the API state (ActiveJobs + status) after a crash/restart.
-// - This does NOT mean subprocess jobs continue running; those are dismissed by design.
+//   - subprocess: not recoverable and will be marked DISMISSED and write server log line.
+//   - aws-batch: query AWS for current state; if terminal then it should finalize; if running then add to ActiveJobs.
+
 func RecoverAllJobs(
 	db Database,
 	storage *s3.S3,
@@ -97,7 +94,7 @@ func recoverDockerJobsFromRecords(
 
 		info, err := dockerCtl.ContainerInfo(context.TODO(), r.HostJobID)
 		if err != nil || !info.Exists {
-			log.Warnf("Recovery(docker): container missing -> marking LOST job=%s container=%s", r.JobID, r.HostJobID)
+			log.Warnf("Recovery(docker): container missing and will be marked LOST job=%s container=%s", r.JobID, r.HostJobID)
 			_ = db.updateJobRecord(r.JobID, LOST, time.Now())
 			continue
 		}
@@ -241,7 +238,7 @@ func recoverAWSBatchJobsFromRecords(
 
 		status, logStream, err := batchCtl.JobMonitor(r.HostJobID)
 		if err != nil {
-			log.Warnf("Recovery(aws-batch): batch job missing -> marking LOST job=%s batch_id=%s", r.JobID, r.HostJobID)
+			log.Warnf("Recovery(aws-batch): batch job missing, marking LOST job=%s batch_id=%s", r.JobID, r.HostJobID)
 			_ = db.updateJobRecord(r.JobID, LOST, time.Now())
 			continue
 		}
