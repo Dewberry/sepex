@@ -33,6 +33,12 @@ func NewPostgresDB(dbConnString string) (*PostgresDB, error) {
 	return &db, nil
 }
 
+func (db *PostgresDB) updateJobHost(jid, host, hostJobID string) error {
+	query := `UPDATE jobs SET host = $2, host_job_id = $3 WHERE id = $1`
+	_, err := db.Handle.Exec(query, jid, host, hostJobID)
+	return err
+}
+
 // createTables in the database if they do not exist already for PostgreSQL
 func (postgresDB *PostgresDB) createTables() error {
 
@@ -43,6 +49,7 @@ func (postgresDB *PostgresDB) createTables() error {
         updated TIMESTAMP WITHOUT TIME ZONE NOT NULL,
         mode TEXT NOT NULL,
         host TEXT NOT NULL,
+				host_job_id TEXT NOT NULL,
         process_id TEXT NOT NULL,
         submitter TEXT NOT NULL DEFAULT ''
     );
@@ -60,9 +67,9 @@ func (postgresDB *PostgresDB) createTables() error {
 }
 
 // AddJob adds a new job to the database
-func (db *PostgresDB) addJob(jid, status, mode, host, processID, submitter string, updated time.Time) error {
-	query := `INSERT INTO jobs (id, status, updated, mode, host, process_id, submitter) VALUES ($1, $2, $3, $4, $5, $6, $7)`
-	_, err := db.Handle.Exec(query, jid, status, updated, mode, host, processID, submitter)
+func (db *PostgresDB) addJob(jid, status, mode, host, hostJobID, processID, submitter string, updated time.Time) error {
+	query := `INSERT INTO jobs (id, status, updated, mode, host, host_job_id, process_id, submitter) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+	_, err := db.Handle.Exec(query, jid, status, updated, mode, host, hostJobID, processID, submitter)
 	return err
 }
 
@@ -75,9 +82,19 @@ func (db *PostgresDB) updateJobRecord(jid, status string, now time.Time) error {
 
 // GetJob retrieves a job record by id
 func (db *PostgresDB) GetJob(jid string) (JobRecord, bool, error) {
-	query := `SELECT * FROM jobs WHERE id = $1`
+	query := `SELECT id, status, updated, mode, host, host_job_id, process_id, submitter FROM jobs WHERE id = $1`
+
 	var jr JobRecord
-	err := db.Handle.QueryRow(query, jid).Scan(&jr.JobID, &jr.Status, &jr.LastUpdate, &jr.Mode, &jr.Host, &jr.ProcessID, &jr.Submitter)
+	err := db.Handle.QueryRow(query, jid).Scan(
+		&jr.JobID,
+		&jr.Status,
+		&jr.LastUpdate,
+		&jr.Mode,
+		&jr.Host,
+		&jr.HostJobID,
+		&jr.ProcessID,
+		&jr.Submitter,
+	)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return JobRecord{}, false, nil
@@ -178,4 +195,37 @@ func (pgDB *PostgresDB) GetJobs(limit, offset int, processIDs, statuses, submitt
 
 func (pgDB *PostgresDB) Close() error {
 	return pgDB.Handle.Close()
+}
+
+func (pgDB *PostgresDB) GetNonTerminalJobs() ([]JobRecord, error) {
+	query := `
+        SELECT id, status, updated, mode, host, host_job_id, process_id, submitter
+        FROM jobs
+        WHERE status NOT IN ('successful','failed','dismissed','lost')
+        ORDER BY updated DESC
+    `
+	rows, err := pgDB.Handle.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := []JobRecord{}
+	for rows.Next() {
+		var r JobRecord
+		if err := rows.Scan(
+			&r.JobID,
+			&r.Status,
+			&r.LastUpdate,
+			&r.Mode,
+			&r.Host,
+			&r.HostJobID,
+			&r.ProcessID,
+			&r.Submitter,
+		); err != nil {
+			return nil, err
+		}
+		res = append(res, r)
+	}
+	return res, rows.Err()
 }

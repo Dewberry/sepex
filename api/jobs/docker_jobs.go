@@ -85,7 +85,7 @@ func (j *DockerJob) GetResources() Resources {
 func (j *DockerJob) UpdateProcessLogs() (err error) {
 	// If old status is one of the terminated status, close has already been called and container logs fetched, container killed
 	switch j.Status {
-	case SUCCESSFUL, DISMISSED, FAILED:
+	case SUCCESSFUL, DISMISSED, FAILED, LOST:
 		return
 	}
 
@@ -150,7 +150,7 @@ func (j *DockerJob) NewStatusUpdate(status string, updateTime time.Time) {
 
 	// If old status is one of the terminated status, it should not update status.
 	switch j.Status {
-	case SUCCESSFUL, DISMISSED, FAILED:
+	case SUCCESSFUL, DISMISSED, FAILED, LOST:
 		return
 	}
 
@@ -237,7 +237,7 @@ func (j *DockerJob) Create() error {
 	j.ctxCancel = cancelFunc
 
 	// At this point job is ready to be added to database
-	err = j.DB.addJob(j.UUID, "accepted", "", "local", j.ProcessName, j.Submitter, time.Now())
+	err = j.DB.addJob(j.UUID, "accepted", "", "docker", "", j.ProcessName, j.Submitter, time.Now())
 	if err != nil {
 		j.ctxCancel()
 		return err
@@ -319,6 +319,7 @@ func (j *DockerJob) Run() {
 	j.NewStatusUpdate(RUNNING, time.Time{})
 
 	j.ContainerID = containerID
+	j.DB.updateJobHost(j.UUID, "docker", containerID)
 
 	// Check if job was cancelled (Kill() was called) before waiting for container
 	select {

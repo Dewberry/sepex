@@ -2,66 +2,68 @@
 <html>
 
 <head>
-    <meta charset="UTF-8">
-    <link rel="icon" href="/public/img/favicon-32x32.png">
-    <title>Logs · {{.JobID}}</title>
-    <link rel="stylesheet" href="/public/css/main.css">
+  <meta charset="UTF-8">
+  <link rel="icon" href="/public/img/favicon-32x32.png">
+  <title>Logs · {{.JobID}}</title>
+  <link rel="stylesheet" href="/public/css/main.css">
 </head>
 
 <body>
-    <h1>
-        Logs · {{.JobID}}
-        {{if eq .Status "successful"}}
-        <img src="/public/svgs/check-icon.svg" alt="successful" />
-        {{else if eq .Status "failed"}}
-        <img src="/public/svgs/cross-icon.svg" alt="failed" />
-        {{else if eq .Status "dismissed"}}
-        <img src="/public/svgs/delete-icon.svg" alt="dismissed" />
-        {{else if or (eq .Status "accepted") (eq .Status "running")}}
-        <img src="/public/svgs/yellow-circle-icon.svg" alt="in progress" />
-        {{end}}
-    </h1>
-    <h2>Process: {{.ProcessID}}</h2>
+  <h1>
+    Logs · {{.JobID}}
+    {{if eq .Status "successful"}}
+    <img src="/public/svgs/check-icon.svg" alt="successful" />
+    {{else if eq .Status "failed"}}
+    <img src="/public/svgs/cross-icon.svg" alt="failed" />
+    {{else if eq .Status "dismissed"}}
+    <img src="/public/svgs/delete-icon.svg" alt="dismissed" />
+    {{else if or (eq .Status "accepted") (eq .Status "running")}}
+    <img src="/public/svgs/yellow-circle-icon.svg" alt="in progress" />
+    {{else if eq .Status "lost"}}
+    <img src="/public/svgs/lost.svg" alt="lost" />
+    {{end}}
+  </h1>
+  <h2>Process: {{.ProcessID}}</h2>
 
-    <h3>Server Logs</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>Time</th>
-                <th>Level</th>
-                <th>Message</th>
-            </tr>
-        </thead>
-        <tbody>
-            {{range .ServerLogs}}
-            <tr>
-                <td>{{.Time.Format "2006-01-02 15:04:05 MST"}}</td>
-                <td class="log-{{.Level | lower}}">{{.Level | upper}}</td>
-                <td>{{.Msg}}</td>
-            </tr>
-            {{end}}
-        </tbody>
-    </table>
+  <h3>Server Logs</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Level</th>
+        <th>Message</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .ServerLogs}}
+      <tr>
+        <td>{{.Time.Format "2006-01-02 15:04:05 MST"}}</td>
+        <td class="log-{{.Level | lower}}">{{.Level | upper}}</td>
+        <td>{{.Msg}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
 
-    <h3>Process Logs</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>Time</th>
-                <th>Level</th>
-                <th>Message</th>
-            </tr>
-        </thead>
-        <tbody>
-            {{range .ProcessLogs}}
-            <tr>
-                <td>{{.Time.Format "2006-01-02 15:04:05 MST"}}</td>
-                <td class="log-{{.Level | lower}}">{{.Level | upper}}</td>
-                <td>{{.Msg}}</td>
-            </tr>
-            {{end}}
-        </tbody>
-    </table>
+  <h3>Process Logs</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Level</th>
+        <th>Message</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .ProcessLogs}}
+      <tr>
+        <td>{{.Time.Format "2006-01-02 15:04:05 MST"}}</td>
+        <td class="log-{{.Level | lower}}">{{.Level | upper}}</td>
+        <td>{{.Msg}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
 
 </body>
 

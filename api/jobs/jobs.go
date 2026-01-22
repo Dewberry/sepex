@@ -85,6 +85,7 @@ type JobRecord struct {
 	ProcessID  string    `json:"processID"`
 	Type       string    `default:"process" json:"type"`
 	Host       string    `json:"host,omitempty"`
+	HostJobID  string    `json:"hostJobID,omitempty"`
 	Mode       string    `json:"mode,omitempty"`
 	Submitter  string    `json:"submitter"`
 }
@@ -140,13 +141,24 @@ const (
 	SUCCESSFUL string = "successful"
 	FAILED     string = "failed"
 	DISMISSED  string = "dismissed"
+	LOST       string = "lost"
 )
 
 // FetchResults by parsing logs
 // Assumes last log will be results always
-func FetchResults(svc *s3.S3, jid string) (interface{}, error) {
+func FetchResults(svc *s3.S3, jid string, status string) (interface{}, error) {
 
-	logs, err := FetchLogs(svc, jid, true)
+	// LOST jobs never have results
+	if status == LOST {
+		return nil, fmt.Errorf("no results available")
+	}
+
+	// Only successful jobs can have results
+	if status != SUCCESSFUL {
+		return nil, fmt.Errorf("job not successful")
+	}
+
+	logs, err := FetchLogs(svc, jid, status, true)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +233,7 @@ func FetchMeta(svc *s3.S3, jid string) (interface{}, error) {
 
 // Check for logs in local disk and storage svc
 // Assumes jobID is valid, if log file doesn't exist then it raises an error
-func FetchLogs(svc *s3.S3, jid string, onlyContainer bool) (JobLogs, error) {
+func FetchLogs(svc *s3.S3, jid string, status string, onlyContainer bool) (JobLogs, error) {
 	var result JobLogs
 	result.JobID = jid
 	localDir := os.Getenv("TMP_JOB_LOGS_DIR") // Local directory where logs are stored
@@ -241,9 +253,14 @@ func FetchLogs(svc *s3.S3, jid string, onlyContainer bool) (JobLogs, error) {
 	}
 
 	for _, k := range keys {
-		// First, check locally
 
 		if k.key == "server" && onlyContainer {
+			continue
+		}
+
+		// NEW: LOST jobs don't have container logs
+		if status == LOST && k.key == "process" {
+			*k.target = []LogEntry{}
 			continue
 		}
 
@@ -255,7 +272,7 @@ func FetchLogs(svc *s3.S3, jid string, onlyContainer bool) (JobLogs, error) {
 			continue
 		}
 
-		// If not found locally, check storage
+		// storage fallback
 		storageKey := fmt.Sprintf("%s/%s.%s.jsonl", os.Getenv("STORAGE_LOGS_PREFIX"), jid, k.key)
 		exists, err := utils.KeyExists(storageKey, svc)
 		if err != nil {
