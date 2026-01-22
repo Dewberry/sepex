@@ -86,7 +86,15 @@ func recoverDockerJobsFromRecords(
 	}
 
 	for _, r := range records {
-		if r.Host != "docker" || r.HostJobID == "" {
+		if r.Host != "docker" {
+			continue
+		}
+
+		if r.HostJobID == "" {
+			if r.Status == ACCEPTED {
+				log.Warnf("Recovery(docker): ACCEPTED job missing container ID, marking DISMISSED job=%s", r.JobID)
+				_ = db.updateJobRecord(r.JobID, DISMISSED, time.Now())
+			}
 			continue
 		}
 
