@@ -374,13 +374,13 @@ func (j *SubprocessJob) Close() {
 		go func() {
 			j.wg.Wait() // wait if other routines like metadata are running
 			j.logFile.Close()
-			UploadLogsToStorage(j.StorageSvc, j.UUID, j.ProcessName)
+			UploadLogsToStorage(j.StorageSvc, j.UUID)
 			// It is expected that logs will be requested multiple times for a recently finished job
 			// so we are waiting for one hour to before deleting the local copy
 			// so that we can avoid repetitive request to storage service.
 			// If the server shutdown, these files would need to be manually deleted
 			time.Sleep(time.Hour)
-			DeleteLocalLogs(j.StorageSvc, j.UUID, j.ProcessName)
+			DeleteLocalLogs(j.StorageSvc, j.UUID)
 		}()
 	})
 }

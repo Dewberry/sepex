@@ -522,7 +522,7 @@ func (j *AWSBatchJob) CloseRecovered() {
 
 	// upload logs
 	if j.StorageSvc != nil {
-		UploadLogsToStorage(j.StorageSvc, j.UUID, j.ProcessName)
+		UploadLogsToStorage(j.StorageSvc, j.UUID)
 	}
 
 	log.Infof("Recovered AWS Batch job %s finalized", j.UUID)
@@ -558,11 +558,11 @@ func (j *AWSBatchJob) Close() {
 		if j.logFile != nil {
 			j.logFile.Close()
 		}
-		UploadLogsToStorage(j.StorageSvc, j.UUID, j.ProcessName)
+		UploadLogsToStorage(j.StorageSvc, j.UUID)
 		// It is expected that logs will be requested multiple times for a recently finished job
 		// so we are waiting for one hour to before deleting the local copy
 		// so that we can avoid repetitive request to storage service
 		time.Sleep(time.Hour)
-		DeleteLocalLogs(j.StorageSvc, j.UUID, j.ProcessName)
+		DeleteLocalLogs(j.StorageSvc, j.UUID)
 	}()
 }

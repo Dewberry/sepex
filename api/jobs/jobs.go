@@ -295,7 +295,7 @@ func FetchLogs(svc *s3.S3, jid string, status string, onlyContainer bool) (JobLo
 }
 
 // Upload log files from local disk to storage service
-func UploadLogsToStorage(svc *s3.S3, jid, pid string) {
+func UploadLogsToStorage(svc *s3.S3, jid string) {
 
 	localDir := os.Getenv("TMP_JOB_LOGS_DIR") // Local directory where logs are stored
 
@@ -319,7 +319,7 @@ func UploadLogsToStorage(svc *s3.S3, jid, pid string) {
 	}
 }
 
-func DeleteLocalLogs(svc *s3.S3, jid, pid string) {
+func DeleteLocalLogs(svc *s3.S3, jid string) {
 	localDir := os.Getenv("TMP_JOB_LOGS_DIR") // Local directory where logs are stored
 
 	// List of log types
