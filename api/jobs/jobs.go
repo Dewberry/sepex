@@ -53,6 +53,7 @@ type Job interface {
 	// At this point job should be ready to be processed and added to database
 	Create() error
 
+	// Whoever is calling NewStatusUpdate with a SUCCESSFUL status must also call WriteMetaData().
 	WriteMetaData()
 	// WriteResults([]byte) error
 

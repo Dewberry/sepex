@@ -27,6 +27,8 @@ func RecoverAllJobs(
 	storage *s3.S3,
 	active *ActiveJobs,
 	doneChan chan Job,
+	resourcePool *ResourcePool,
+	processResources map[string]Resources,
 ) error {
 
 	records, err := db.GetNonTerminalJobs()
@@ -52,7 +54,7 @@ func RecoverAllJobs(
 	)
 
 	// Run recoveries in a stable order.
-	if err := recoverDockerJobsFromRecords(db, storage, active, doneChan, records); err != nil {
+	if err := recoverDockerJobsFromRecords(db, storage, active, doneChan, resourcePool, processResources, records); err != nil {
 		return fmt.Errorf("docker recovery failed: %w", err)
 	}
 
@@ -77,6 +79,8 @@ func recoverDockerJobsFromRecords(
 	storageSvc *s3.S3,
 	activeJobs *ActiveJobs,
 	doneChan chan Job,
+	resourcePool *ResourcePool,
+	processResources map[string]Resources,
 	records []JobRecord,
 ) error {
 
@@ -90,10 +94,16 @@ func recoverDockerJobsFromRecords(
 			continue
 		}
 
+		if r.Status == ACCEPTED {
+			log.Warnf("Recovery(docker): ACCEPTED job never started; insufficient data to requeue, marking DISMISSED job=%s", r.JobID)
+			_ = db.updateJobRecord(r.JobID, DISMISSED, time.Now())
+			continue
+		}
+
 		if r.HostJobID == "" {
-			if r.Status == ACCEPTED {
-				log.Warnf("Recovery(docker): ACCEPTED job missing container ID, marking DISMISSED job=%s", r.JobID)
-				_ = db.updateJobRecord(r.JobID, DISMISSED, time.Now())
+			if r.Status == RUNNING {
+				log.Warnf("Recovery(docker): RUNNING job missing container ID, marking LOST job=%s", r.JobID)
+				_ = db.updateJobRecord(r.JobID, LOST, time.Now())
 			}
 			continue
 		}
@@ -115,6 +125,7 @@ func recoverDockerJobsFromRecords(
 			DB:          db,
 			StorageSvc:  storageSvc,
 			DoneChan:    doneChan,
+			Recovered:   true,
 		}
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -126,9 +137,20 @@ func recoverDockerJobsFromRecords(
 			continue
 		}
 
+		if resourcePool != nil {
+			job.ResourcePool = resourcePool
+			if res, ok := processResources[r.ProcessID]; ok {
+				job.Resources = res
+				resourcePool.ReserveForce(res.CPUs, res.Memory)
+			} else {
+				log.Warnf("Recovery(docker): process resources not found job=%s process=%s", r.JobID, r.ProcessID)
+			}
+		}
+
 		// Register in ActiveJobs
 		var j Job = job
 		activeJobs.Jobs[j.JobID()] = &j
+		job.logger.Info("Job recovered after restart. Some features might be missing")
 
 		log.Infof("Recovery(docker): added to ActiveJobs job=%s running=%v exit=%d", r.JobID, info.Running, info.ExitCode)
 
@@ -143,29 +165,37 @@ func recoverDockerJobsFromRecords(
 }
 
 func recoverRunningContainer(j *DockerJob, dockerCtl *controllers.DockerController) {
+	defer func() {
+		if j.ResourcePool != nil {
+			j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory)
+		}
+	}()
 	exitCode, err := dockerCtl.ContainerWait(context.TODO(), j.ContainerID)
-	if err != nil {
+	finalizeRecoveredDocker(j, exitCode, err)
+}
+
+func recoverExitedContainer(j *DockerJob, exitCode int) {
+	defer func() {
+		if j.ResourcePool != nil {
+			j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory)
+		}
+	}()
+	finalizeRecoveredDocker(j, int64(exitCode), nil)
+}
+
+func finalizeRecoveredDocker(j *DockerJob, exitCode int64, waitErr error) {
+	defer j.Close()
+	if waitErr != nil {
 		j.NewStatusUpdate(FAILED, time.Now())
-		j.Close()
 		return
 	}
 
 	if exitCode == 0 {
 		j.NewStatusUpdate(SUCCESSFUL, time.Now())
+		go j.WriteMetaData()
 	} else {
 		j.NewStatusUpdate(FAILED, time.Now())
 	}
-
-	j.Close()
-}
-
-func recoverExitedContainer(j *DockerJob, exitCode int) {
-	if exitCode == 0 {
-		j.NewStatusUpdate(SUCCESSFUL, time.Now())
-	} else {
-		j.NewStatusUpdate(FAILED, time.Now())
-	}
-	j.Close()
 }
 
 // ---------------------------
@@ -239,6 +269,17 @@ func recoverAWSBatchJobsFromRecords(
 
 	for _, r := range records {
 		if r.Host != "aws-batch" || r.HostJobID == "" {
+			if r.Host != "aws-batch" {
+				continue
+			}
+			switch r.Status {
+			case ACCEPTED:
+				log.Warnf("Recovery(aws-batch): ACCEPTED job never started; insufficient data to requeue, marking DISMISSED job=%s", r.JobID)
+				_ = db.updateJobRecord(r.JobID, DISMISSED, time.Now())
+			case RUNNING:
+				log.Warnf("Recovery(aws-batch): RUNNING job missing batch ID, marking LOST job=%s", r.JobID)
+				_ = db.updateJobRecord(r.JobID, LOST, time.Now())
+			}
 			continue
 		}
 
@@ -274,6 +315,10 @@ func recoverAWSBatchJobsFromRecords(
 		log.Infof("Recovery(aws-batch): added to ActiveJobs job=%s aws_status=%s", r.JobID, status)
 
 		switch status {
+		case "ACCEPTED", "ACCCEPTED":
+			j.NewStatusUpdate(ACCEPTED, time.Now())
+			// No watcher loop: system expects status updates to come via the status endpoint.
+
 		case "RUNNING":
 			j.NewStatusUpdate(RUNNING, time.Now())
 			// No watcher loop: system expects status updates to come via the status endpoint.

@@ -30,6 +30,8 @@ type metaData struct {
 	// User    string  `json:"apiUser"`
 	Process process `json:"process"`
 	Image   image   `json:"image,omitempty"`
+	// RecoveryNotice indicates the job was recovered after restart and metadata may be incomplete.
+	RecoveryNotice string `json:"recoveryNotice,omitempty"`
 	// ComputeEnvironmentURI    string    // ARN
 	// ComputeEnvironmentDigest string    // required for reproducibility, will need to be custom implemented
 	Commands        []string  `json:"commands"`
@@ -235,4 +237,3 @@ func fetchGHCRToken(repo string) (string, error) {
 
 	return data.Token, nil
 }
-

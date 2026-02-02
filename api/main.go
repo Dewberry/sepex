@@ -268,11 +268,20 @@ func main() {
 	// todo: handle this error: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running
 	// todo: all non terminated job statuses should be updated to unknown
 	// todo: all logs in the logs directory should be moved to storage
+	processResources := make(map[string]jobs.Resources)
+	for _, p := range rh.ProcessList.List {
+		processResources[p.Info.ID] = jobs.Resources{
+			CPUs:   p.Config.Resources.CPUs,
+			Memory: p.Config.Resources.Memory,
+		}
+	}
 	if err := jobs.RecoverAllJobs(
 		rh.DB,
 		rh.StorageSvc,
 		rh.ActiveJobs,
 		rh.MessageQueue.JobDone,
+		rh.ResourcePool,
+		processResources,
 	); err != nil {
 		log.Fatalf("job recovery failed: %v", err)
 	}

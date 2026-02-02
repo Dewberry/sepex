@@ -69,6 +69,7 @@ func (sqliteDB *SQLiteDB) createTables() error {
 		updated TIMESTAMP NOT NULL,
 		mode TEXT NOT NULL,
 		host TEXT NOT NULL,
+		host_job_id TEXT NOT NULL DEFAULT '',
 		process_id TEXT NOT NULL,
 		submitter TEXT NOT NULL DEFAULT ''
 	);
@@ -81,6 +82,13 @@ func (sqliteDB *SQLiteDB) createTables() error {
 	_, err := sqliteDB.Handle.Exec(queryJobs)
 	if err != nil {
 		return fmt.Errorf("error creating tables: %s", err)
+	}
+
+	// Backfill schema for older databases that predate host_job_id.
+	if _, err := sqliteDB.Handle.Exec(`ALTER TABLE jobs ADD COLUMN host_job_id TEXT NOT NULL DEFAULT ''`); err != nil {
+		if !strings.Contains(err.Error(), "duplicate column") && !strings.Contains(err.Error(), "already exists") {
+			return fmt.Errorf("error adding host_job_id column: %s", err)
+		}
 	}
 	return nil
 }
@@ -97,8 +105,8 @@ func (sqliteDB *SQLiteDB) addJob(jid, status, mode, host, hostJobID, processID, 
 }
 
 func (sqliteDB *SQLiteDB) updateJobHost(jid, host, hostJobID string) error {
-	query := `UPDATE jobs SET host = $2, host_job_id = $3 WHERE id = $1`
-	_, err := sqliteDB.Handle.Exec(query, jid, host, hostJobID)
+	query := `UPDATE jobs SET host = ?, host_job_id = ? WHERE id = ?`
+	_, err := sqliteDB.Handle.Exec(query, host, hostJobID, jid)
 	return err
 }
 

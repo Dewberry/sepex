@@ -49,7 +49,7 @@ func (postgresDB *PostgresDB) createTables() error {
         updated TIMESTAMP WITHOUT TIME ZONE NOT NULL,
         mode TEXT NOT NULL,
         host TEXT NOT NULL,
-				host_job_id TEXT NOT NULL,
+				host_job_id TEXT NOT NULL DEFAULT '',
         process_id TEXT NOT NULL,
         submitter TEXT NOT NULL DEFAULT ''
     );
@@ -62,6 +62,11 @@ func (postgresDB *PostgresDB) createTables() error {
 	_, err := postgresDB.Handle.Exec(queryJobs)
 	if err != nil {
 		return fmt.Errorf("error creating tables: %s", err)
+	}
+
+	// Backfill schema for older databases that predate host_job_id.
+	if _, err := postgresDB.Handle.Exec(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS host_job_id TEXT NOT NULL DEFAULT ''`); err != nil {
+		return fmt.Errorf("error adding host_job_id column: %s", err)
 	}
 	return nil
 }

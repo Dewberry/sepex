@@ -204,21 +204,24 @@ func (j *AWSBatchJob) Equals(job Job) bool {
 }
 
 func (j *AWSBatchJob) initLogger() error {
-	// Create a place holder file for container logs
-	file, err := os.Create(fmt.Sprintf("%s/%s.process.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
-	if err != nil {
+	// Ensure process log file exists without truncation
+	processPath := fmt.Sprintf("%s/%s.process.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID)
+	if f, err := os.OpenFile(processPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err != nil {
 		return fmt.Errorf("failed to open log file: %s", err.Error())
+	} else {
+		f.Close()
 	}
-	file.Close()
 
 	// Create logger for server logs
 	j.logger = log.New()
 
-	file, err = os.Create(fmt.Sprintf("%s/%s.server.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
+	serverPath := fmt.Sprintf("%s/%s.server.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID)
+	file, err := os.OpenFile(serverPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %s", err.Error())
 	}
 
+	j.logFile = file
 	j.logger.SetOutput(file)
 	j.logger.SetFormatter(&log.JSONFormatter{})
 
@@ -501,8 +504,16 @@ func (j *AWSBatchJob) isRecovered() bool {
 	return j.ctxCancel == nil
 }
 func (j *AWSBatchJob) CloseRecovered() {
-	// fetch logs once
-	_ = j.UpdateProcessLogs()
+	// fetch logs with retries to allow for CloudWatch lag
+	const maxAttempts = 5
+	for i := 1; i <= maxAttempts; i++ {
+		time.Sleep(time.Duration(i) * 5 * time.Second)
+		if err := j.UpdateProcessLogs(); err != nil {
+			j.logger.Errorf("Trial %d: Could not update container logs. Error: %s", i, err.Error())
+		} else {
+			break
+		}
+	}
 
 	// mark job done
 	if j.DoneChan != nil {
@@ -544,7 +555,9 @@ func (j *AWSBatchJob) Close() {
 
 	go func() {
 		j.wg.Wait() // wait if other routines like metadata are running because they can send logs
-		j.logFile.Close()
+		if j.logFile != nil {
+			j.logFile.Close()
+		}
 		UploadLogsToStorage(j.StorageSvc, j.UUID, j.ProcessName)
 		// It is expected that logs will be requested multiple times for a recently finished job
 		// so we are waiting for one hour to before deleting the local copy

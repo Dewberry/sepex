@@ -629,7 +629,7 @@ func (rh *RESTHandler) ListJobsHandler(c echo.Context) error {
 	}
 	for _, st := range statusList {
 		switch st {
-		case jobs.ACCEPTED, jobs.RUNNING, jobs.DISMISSED, jobs.FAILED, jobs.SUCCESSFUL:
+		case jobs.ACCEPTED, jobs.RUNNING, jobs.DISMISSED, jobs.FAILED, jobs.SUCCESSFUL, jobs.LOST:
 			// valid status
 		default:
 			output := errResponse{HTTPStatus: http.StatusBadRequest, Message: "One or more status values not valid"}

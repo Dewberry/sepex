@@ -47,6 +47,7 @@ type DockerJob struct {
 	DoneChan     chan Job
 	ResourcePool *ResourcePool
 	IsSync       bool
+	Recovered    bool
 }
 
 func (j *DockerJob) WaitForRunCompletion() {
@@ -182,21 +183,24 @@ func (j *DockerJob) Equals(job Job) bool {
 }
 
 func (j *DockerJob) initLogger() error {
-	// Create a place holder file for container logs
-	file, err := os.Create(fmt.Sprintf("%s/%s.process.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
-	if err != nil {
+	// Ensure process log file exists without truncation
+	processPath := fmt.Sprintf("%s/%s.process.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID)
+	if f, err := os.OpenFile(processPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err != nil {
 		return fmt.Errorf("failed to open log file: %s", err.Error())
+	} else {
+		f.Close()
 	}
-	file.Close()
 
 	// Create logger for server logs
 	j.logger = log.New()
 
-	file, err = os.Create(fmt.Sprintf("%s/%s.server.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
+	serverPath := fmt.Sprintf("%s/%s.server.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID)
+	file, err := os.OpenFile(serverPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %s", err.Error())
 	}
 
+	j.logFile = file
 	j.logger.SetOutput(file)
 	j.logger.SetFormatter(&log.JSONFormatter{})
 
@@ -383,13 +387,18 @@ func (j *DockerJob) WriteMetaData() {
 	}
 
 	p := process{j.ProcessID(), j.ProcessVersionID()}
-	imageDigest, err := c.GetImageDigest(j.IMAGE()) // what if image is update between start of job and this call?
-	if err != nil {
-		j.logger.Errorf("Error getting Image Digest: %s", err.Error())
-		return
+	var i image
+	if j.IMAGE() != "" {
+		imageDigest, err := c.GetImageDigest(j.IMAGE()) // what if image is update between start of job and this call?
+		if err != nil {
+			if !j.Recovered {
+				j.logger.Errorf("Error getting Image Digest: %s", err.Error())
+				return
+			}
+		} else {
+			i = image{j.IMAGE(), imageDigest}
+		}
 	}
-
-	i := image{j.IMAGE(), imageDigest}
 
 	g, s, e, err := c.GetJobTimes(j.ContainerID)
 	if err != nil {
@@ -408,6 +417,9 @@ func (j *DockerJob) WriteMetaData() {
 		GeneratedAtTime: g,
 		StartedAtTime:   s,
 		EndedAtTime:     e,
+	}
+	if j.Recovered {
+		md.RecoveryNotice = "Job was recovered after restart; metadata may be incomplete."
 	}
 
 	jsonBytes, err := json.Marshal(md)
@@ -509,7 +521,9 @@ func (j *DockerJob) Close() {
 
 		go func() {
 			j.wg.Wait() // wait if other routines like metadata are running
-			j.logFile.Close()
+			if j.logFile != nil {
+				j.logFile.Close()
+			}
 			UploadLogsToStorage(j.StorageSvc, j.UUID, j.ProcessName)
 			// It is expected that logs will be requested multiple times for a recently finished job
 			// so we are waiting for one hour to before deleting the local copy
