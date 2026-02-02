@@ -95,14 +95,14 @@ func recoverDockerJobsFromRecords(
 		}
 
 		if r.Status == ACCEPTED {
-			log.Warnf("Recovery(docker): ACCEPTED job never started; insufficient data to requeue, marking DISMISSED job=%s", r.JobID)
+			log.Infof("Recovery(docker): ACCEPTED job never started; insufficient data to requeue, marking DISMISSED job=%s", r.JobID)
 			_ = db.updateJobRecord(r.JobID, DISMISSED, time.Now())
 			continue
 		}
 
 		if r.HostJobID == "" {
 			if r.Status == RUNNING {
-				log.Warnf("Recovery(docker): RUNNING job missing container ID, marking LOST job=%s", r.JobID)
+				log.Infof("Recovery(docker): RUNNING job missing container ID, marking LOST job=%s", r.JobID)
 				_ = db.updateJobRecord(r.JobID, LOST, time.Now())
 			}
 			continue
@@ -202,7 +202,7 @@ func finalizeRecoveredDocker(j *DockerJob, exitCode int64, waitErr error) {
 // Subprocess dismissal
 // ---------------------------
 
-// dismissSubprocessJobsFromRecords marks any non-terminal subprocess job as DISMISSED
+// dismissSubprocessJobsFromRecords marks any non-terminal subprocess job as DISMISSED or LOST
 // and appends a server log line explaining it was dismissed due to restart/crash.
 //
 // Subprocess jobs are intentionally not recoverable: after an API restart we cannot
@@ -213,14 +213,15 @@ func dismissSubprocessJobsFromRecords(db Database, records []JobRecord) error {
 			continue
 		}
 
-		log.Warnf("Recovery(subprocess): dismissing job=%s prev_status=%s", r.JobID, r.Status)
-
-		_ = db.updateJobRecord(r.JobID, DISMISSED, time.Now())
-
-		// Best-effort log line for UI visibility
-		if err := appendDismissedDueToRestartLog(r.JobID); err != nil {
-			log.Warnf("Recovery(subprocess): failed writing dismissal log job=%s: %v", r.JobID, err)
+		switch r.Status {
+		case ACCEPTED:
+			log.Infof("Recovery(subprocess): ACCEPTED job never started; insufficient data to requeue, marking DISMISSED job=%s", r.JobID)
+			_ = db.updateJobRecord(r.JobID, DISMISSED, time.Now())
+		case RUNNING:
+			log.Infof("Recovery(subprocess): RUNNING job missing process ID, marking LOST job=%s", r.JobID)
+			_ = db.updateJobRecord(r.JobID, LOST, time.Now())
 		}
+
 	}
 	return nil
 }
