@@ -336,3 +336,8 @@ func DeleteLocalLogs(svc *s3.S3, jid string) {
 		}
 	}
 }
+
+func UploadLogsToStorageAndDeleteLocal(svc *s3.S3, jid string) {
+	UploadLogsToStorage(svc, jid)
+	DeleteLocalLogs(svc, jid)
+}

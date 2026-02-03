@@ -58,7 +58,7 @@ func RecoverAllJobs(
 		return fmt.Errorf("docker recovery failed: %w", err)
 	}
 
-	if err := dismissSubprocessJobsFromRecords(db, storage, records); err != nil {
+	if err := handleSubprocessJobsFromRecords(db, storage, records); err != nil {
 		return fmt.Errorf("subprocess dismissal failed: %w", err)
 	}
 
@@ -97,14 +97,24 @@ func recoverDockerJobsFromRecords(
 		if r.Status == ACCEPTED {
 			log.Infof("Recovery(docker): ACCEPTED job never started; insufficient data to requeue, marking DISMISSED job=%s", r.JobID)
 			_ = db.updateJobRecord(r.JobID, DISMISSED, time.Now())
+			err := appendJobRecoveryMessage(r.JobID, "Job dismissed due to service restart/crash")
+			if err != nil {
+				log.Warnf("Failed to append recovery message for job=%s: %v", r.JobID, err)
+			}
+			UploadLogsToStorageAndDeleteLocal(storageSvc, r.JobID)
 			continue
 		}
 
 		if r.HostJobID == "" {
 			if r.Status == RUNNING {
-				log.Infof("Recovery(docker): RUNNING job missing container ID, marking LOST job=%s", r.JobID)
+				log.Warnf("Recovery(docker): RUNNING job missing container ID, marking LOST job=%s", r.JobID)
 				_ = db.updateJobRecord(r.JobID, LOST, time.Now())
 			}
+			err := appendJobRecoveryMessage(r.JobID, "Job lost due to service restart/crash")
+			if err != nil {
+				log.Warnf("Failed to append recovery message for job=%s: %v", r.JobID, err)
+			}
+			UploadLogsToStorageAndDeleteLocal(storageSvc, r.JobID)
 			continue
 		}
 
@@ -114,6 +124,11 @@ func recoverDockerJobsFromRecords(
 		if err != nil || !info.Exists {
 			log.Warnf("Recovery(docker): container missing and will be marked LOST job=%s container=%s", r.JobID, r.HostJobID)
 			_ = db.updateJobRecord(r.JobID, LOST, time.Now())
+			err := appendJobRecoveryMessage(r.JobID, "Job lost due to service restart/crash")
+			if err != nil {
+				log.Warnf("Failed to append recovery message for job=%s: %v", r.JobID, err)
+			}
+			UploadLogsToStorageAndDeleteLocal(storageSvc, r.JobID)
 			continue
 		}
 
@@ -134,17 +149,13 @@ func recoverDockerJobsFromRecords(
 
 		if err := job.initLogger(); err != nil {
 			log.Warnf("Recovery(docker): failed to rebuild in-memory job=%s: %v", r.JobID, err)
-			continue
-		}
-
-		if resourcePool != nil {
-			job.ResourcePool = resourcePool
-			if res, ok := processResources[r.ProcessID]; ok {
-				job.Resources = res
-				resourcePool.ReserveForce(res.CPUs, res.Memory)
-			} else {
-				log.Warnf("Recovery(docker): process resources not found job=%s process=%s", r.JobID, r.ProcessID)
+			_ = db.updateJobRecord(r.JobID, LOST, time.Now())
+			err := appendJobRecoveryMessage(r.JobID, "Job lost due to service restart/crash")
+			if err != nil {
+				log.Warnf("Failed to append recovery message for job=%s: %v", r.JobID, err)
 			}
+			UploadLogsToStorageAndDeleteLocal(storageSvc, r.JobID)
+			continue
 		}
 
 		// Register in ActiveJobs
@@ -155,6 +166,15 @@ func recoverDockerJobsFromRecords(
 		log.Infof("Recovery(docker): added to ActiveJobs job=%s running=%v exit=%d", r.JobID, info.Running, info.ExitCode)
 
 		if info.Running {
+			if resourcePool != nil {
+				job.ResourcePool = resourcePool
+				if res, ok := processResources[r.ProcessID]; ok {
+					job.Resources = res
+					resourcePool.ReserveForce(res.CPUs, res.Memory)
+				} else {
+					log.Warnf("Recovery(docker): process resources not found job=%s process=%s", r.JobID, r.ProcessID)
+				}
+			}
 			go recoverRunningContainer(job, dockerCtl)
 		} else {
 			go recoverExitedContainer(job, info.ExitCode)
@@ -175,11 +195,6 @@ func recoverRunningContainer(j *DockerJob, dockerCtl *controllers.DockerControll
 }
 
 func recoverExitedContainer(j *DockerJob, exitCode int) {
-	defer func() {
-		if j.ResourcePool != nil {
-			j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory)
-		}
-	}()
 	finalizeRecoveredDocker(j, int64(exitCode), nil)
 }
 
@@ -202,12 +217,12 @@ func finalizeRecoveredDocker(j *DockerJob, exitCode int64, waitErr error) {
 // Subprocess dismissal
 // ---------------------------
 
-// dismissSubprocessJobsFromRecords marks any non-terminal subprocess job as DISMISSED or LOST
+// handleSubprocessJobsFromRecords marks any non-terminal subprocess job as DISMISSED or LOST
 // and appends a server log line explaining it was dismissed due to restart/crash.
 //
 // Subprocess jobs are intentionally not recoverable: after an API restart we cannot
 // reliably reconnect to the child process or guarantee its state.
-func dismissSubprocessJobsFromRecords(db Database, storageSvc *s3.S3, records []JobRecord) error {
+func handleSubprocessJobsFromRecords(db Database, storageSvc *s3.S3, records []JobRecord) error {
 	for _, r := range records {
 		if r.Host != "subprocess" {
 			continue
@@ -217,26 +232,30 @@ func dismissSubprocessJobsFromRecords(db Database, storageSvc *s3.S3, records []
 		case ACCEPTED:
 			log.Infof("Recovery(subprocess): ACCEPTED job never started; insufficient data to requeue, marking DISMISSED job=%s", r.JobID)
 			_ = db.updateJobRecord(r.JobID, DISMISSED, time.Now())
+			err := appendJobRecoveryMessage(r.JobID, "Job dismissed due to service restart/crash")
+			if err != nil {
+				log.Warnf("Failed to append recovery message for job=%s: %v", r.JobID, err)
+			}
+			UploadLogsToStorageAndDeleteLocal(storageSvc, r.JobID)
 		case RUNNING:
 			log.Infof("Recovery(subprocess): RUNNING job missing process ID, marking LOST job=%s", r.JobID)
 			_ = db.updateJobRecord(r.JobID, LOST, time.Now())
-
-			if err := appendDismissedDueToRestartLog(r.JobID); err != nil {
-				log.Warnf("Recovery(subprocess): failed writing dismissal log job=%s: %v", r.JobID, err)
+			err := appendJobRecoveryMessage(r.JobID, "Job lost due to service restart/crash")
+			if err != nil {
+				log.Warnf("Failed to append recovery message for job=%s: %v", r.JobID, err)
 			}
-
-			UploadLogsToStorage(storageSvc, r.JobID)
-			DeleteLocalLogs(storageSvc, r.JobID)
+			UploadLogsToStorageAndDeleteLocal(storageSvc, r.JobID)
 		}
 	}
 	return nil
 }
 
-func appendDismissedDueToRestartLog(jobID string) error {
+// logs must already exist on local disk
+func appendJobRecoveryMessage(jobID, msg string) error {
 	dir := os.Getenv("TMP_JOB_LOGS_DIR")
 	fp := filepath.Join(dir, fmt.Sprintf("%s.server.jsonl", jobID))
 
-	f, err := os.OpenFile(fp, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(fp, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
@@ -244,9 +263,8 @@ func appendDismissedDueToRestartLog(jobID string) error {
 
 	// Match LogEntry fields in jobs.go: Level, Msg, Time
 	line := fmt.Sprintf(
-		`{"time":"%s","level":"warning","msg":"Job lost due to service restart/crash"}%s`,
-		time.Now().UTC().Format(time.RFC3339Nano),
-		"\n",
+		`{"time":"%s","level":"warning","msg":"%s"}%s`,
+		time.Now().UTC().Format(time.RFC3339Nano), msg, "\n",
 	)
 
 	_, err = f.WriteString(line)
@@ -276,17 +294,6 @@ func recoverAWSBatchJobsFromRecords(
 
 	for _, r := range records {
 		if r.Host != "aws-batch" || r.HostJobID == "" {
-			if r.Host != "aws-batch" {
-				continue
-			}
-			switch r.Status {
-			case ACCEPTED:
-				log.Warnf("Recovery(aws-batch): ACCEPTED job never started; insufficient data to requeue, marking DISMISSED job=%s", r.JobID)
-				_ = db.updateJobRecord(r.JobID, DISMISSED, time.Now())
-			case RUNNING:
-				log.Warnf("Recovery(aws-batch): RUNNING job missing batch ID, marking LOST job=%s", r.JobID)
-				_ = db.updateJobRecord(r.JobID, LOST, time.Now())
-			}
 			continue
 		}
 
@@ -296,6 +303,11 @@ func recoverAWSBatchJobsFromRecords(
 		if err != nil {
 			log.Warnf("Recovery(aws-batch): batch job missing, marking LOST job=%s batch_id=%s", r.JobID, r.HostJobID)
 			_ = db.updateJobRecord(r.JobID, LOST, time.Now())
+			err := appendJobRecoveryMessage(r.JobID, "Job lost due to service restart/crash")
+			if err != nil {
+				log.Warnf("Failed to append recovery message for job=%s: %v", r.JobID, err)
+			}
+			UploadLogsToStorageAndDeleteLocal(storage, r.JobID)
 			continue
 		}
 
@@ -314,24 +326,29 @@ func recoverAWSBatchJobsFromRecords(
 
 		if err := j.initLogger(); err != nil {
 			log.Warnf("Recovery(aws-batch): failed to init logger job=%s: %v", r.JobID, err)
+			_ = db.updateJobRecord(r.JobID, LOST, time.Now())
+			err := appendJobRecoveryMessage(r.JobID, "Job lost due to service restart/crash")
+			if err != nil {
+				log.Warnf("Failed to append recovery message for job=%s: %v", r.JobID, err)
+			}
+			UploadLogsToStorageAndDeleteLocal(storage, r.JobID)
 			continue
 		}
 
 		var job Job = j
 		active.Jobs[j.JobID()] = &job
+		j.logger.Info("Job recovered after restart. Some features might be missing")
 		log.Infof("Recovery(aws-batch): added to ActiveJobs job=%s aws_status=%s", r.JobID, status)
 
+		// Bring status up to date
 		switch status {
-		case "ACCEPTED", "ACCCEPTED":
-			j.NewStatusUpdate(ACCEPTED, time.Now())
-			// No watcher loop: system expects status updates to come via the status endpoint.
-
 		case "RUNNING":
 			j.NewStatusUpdate(RUNNING, time.Now())
 			// No watcher loop: system expects status updates to come via the status endpoint.
 
-		case "SUCCEEDED":
+		case "SUCCESSFUL":
 			j.NewStatusUpdate(SUCCESSFUL, time.Now())
+			go j.WriteMetaData()
 			go j.Close()
 
 		case "FAILED":
@@ -341,9 +358,6 @@ func recoverAWSBatchJobsFromRecords(
 		case "DISMISSED":
 			j.NewStatusUpdate(DISMISSED, time.Now())
 			go j.Close()
-
-		default:
-			log.Warnf("Recovery(aws-batch): unhandled aws status=%s job=%s", status, r.JobID)
 		}
 	}
 
