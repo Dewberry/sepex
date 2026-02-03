@@ -325,6 +325,10 @@ func recoverAWSBatchJobsFromRecords(
 			DoneChan:      doneChan,
 		}
 
+		ctx, cancel := context.WithCancel(context.Background())
+		j.ctx = ctx
+		j.ctxCancel = cancel
+
 		if err := j.initLogger(); err != nil {
 			log.Warnf("Recovery(aws-batch): failed to init logger job=%s: %v", r.JobID, err)
 			_ = db.updateJobRecord(r.JobID, LOST, time.Now())
