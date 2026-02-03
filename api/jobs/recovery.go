@@ -58,7 +58,7 @@ func RecoverAllJobs(
 		return fmt.Errorf("docker recovery failed: %w", err)
 	}
 
-	if err := dismissSubprocessJobsFromRecords(db, records); err != nil {
+	if err := dismissSubprocessJobsFromRecords(db, storage, records); err != nil {
 		return fmt.Errorf("subprocess dismissal failed: %w", err)
 	}
 
@@ -207,7 +207,7 @@ func finalizeRecoveredDocker(j *DockerJob, exitCode int64, waitErr error) {
 //
 // Subprocess jobs are intentionally not recoverable: after an API restart we cannot
 // reliably reconnect to the child process or guarantee its state.
-func dismissSubprocessJobsFromRecords(db Database, records []JobRecord) error {
+func dismissSubprocessJobsFromRecords(db Database, storageSvc *s3.S3, records []JobRecord) error {
 	for _, r := range records {
 		if r.Host != "subprocess" {
 			continue
@@ -220,8 +220,14 @@ func dismissSubprocessJobsFromRecords(db Database, records []JobRecord) error {
 		case RUNNING:
 			log.Infof("Recovery(subprocess): RUNNING job missing process ID, marking LOST job=%s", r.JobID)
 			_ = db.updateJobRecord(r.JobID, LOST, time.Now())
-		}
 
+			if err := appendDismissedDueToRestartLog(r.JobID); err != nil {
+				log.Warnf("Recovery(subprocess): failed writing dismissal log job=%s: %v", r.JobID, err)
+			}
+
+			UploadLogsToStorage(storageSvc, r.JobID)
+			DeleteLocalLogs(storageSvc, r.JobID)
+		}
 	}
 	return nil
 }
@@ -238,7 +244,7 @@ func appendDismissedDueToRestartLog(jobID string) error {
 
 	// Match LogEntry fields in jobs.go: Level, Msg, Time
 	line := fmt.Sprintf(
-		`{"time":"%s","level":"warning","msg":"Job dismissed due to API restart/crash (subprocess jobs are not recoverable)."}%s`,
+		`{"time":"%s","level":"warning","msg":"Job lost due to service restart/crash"}%s`,
 		time.Now().UTC().Format(time.RFC3339Nano),
 		"\n",
 	)
