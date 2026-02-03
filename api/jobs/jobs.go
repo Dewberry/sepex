@@ -147,19 +147,8 @@ const (
 
 // FetchResults by parsing logs
 // Assumes last log will be results always
-func FetchResults(svc *s3.S3, jid string, status string) (interface{}, error) {
-
-	// LOST jobs never have results
-	if status == LOST {
-		return nil, fmt.Errorf("no results available")
-	}
-
-	// Only successful jobs can have results
-	if status != SUCCESSFUL {
-		return nil, fmt.Errorf("job not successful")
-	}
-
-	logs, err := FetchLogs(svc, jid, status, true)
+func FetchResults(svc *s3.S3, jid string) (interface{}, error) {
+	logs, err := FetchLogs(svc, jid, true)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +223,7 @@ func FetchMeta(svc *s3.S3, jid string) (interface{}, error) {
 
 // Check for logs in local disk and storage svc
 // Assumes jobID is valid, if log file doesn't exist then it raises an error
-func FetchLogs(svc *s3.S3, jid string, status string, onlyContainer bool) (JobLogs, error) {
+func FetchLogs(svc *s3.S3, jid string, onlyContainer bool) (JobLogs, error) {
 	var result JobLogs
 	result.JobID = jid
 	localDir := os.Getenv("TMP_JOB_LOGS_DIR") // Local directory where logs are stored
@@ -256,12 +245,6 @@ func FetchLogs(svc *s3.S3, jid string, status string, onlyContainer bool) (JobLo
 	for _, k := range keys {
 
 		if k.key == "server" && onlyContainer {
-			continue
-		}
-
-		// NEW: LOST jobs don't have container logs
-		if status == LOST && k.key == "process" {
-			*k.target = []LogEntry{}
 			continue
 		}
 
