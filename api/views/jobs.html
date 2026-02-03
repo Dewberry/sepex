@@ -4,62 +4,62 @@
 <html>
 
 <head>
-  <meta charset="UTF-8">
-  <link rel="icon" href="/public/img/favicon-32x32.png">
-  <title>Jobs List</title>
-  <link rel="stylesheet" href="/public/css/main.css">
+    <meta charset="UTF-8">
+    <link rel="icon" href="/public/img/favicon-32x32.png">
+    <title>Jobs List</title>
+    <link rel="stylesheet" href="/public/css/main.css">
 </head>
 
 <body>
-  <h1>Jobs List</h1>
-  <table>
-    <thead>
-      <tr>
-        <th>Logs (JobID)</th>
-        <th>Status</th>
-        <th>ProcessID</th>
-        <th>Submitter</th>
-        <th>Updated</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{range .jobs}}
-      <tr>
-        <td><a href="/jobs/{{.JobID}}/logs" target="_blank">{{.JobID}}</a></td>
-        <td>
-          {{if eq .Status "successful"}}
-          <img src="/public/svgs/check-icon.svg" alt="successful" />
-          {{else if eq .Status "failed"}}
-          <img src="/public/svgs/cross-icon.svg" alt="failed" />
-          {{else if eq .Status "dismissed"}}
-          <img src="/public/svgs/delete-icon.svg" alt="dismissed" />
-          {{else if or (eq .Status "accepted") (eq .Status "running")}}
-          <img src="/public/svgs/yellow-circle-icon.svg" alt="in progress" />
-          {{else if eq .Status "lost"}}
-          <img src="/public/svgs/lost-icon.svg" alt="lost" />
-          {{end}}
-          <a href="/jobs/{{.JobID}}" target="_blank">
-            {{.Status}}
-          </a>
-        </td>
-        <td><a href="/processes/{{.ProcessID}}" target="_blank">{{.ProcessID}}</a></td>
-        <td>{{.Submitter}}</td>
-        <td>{{.LastUpdate.Format "2006-01-02 15:04:05 MST"}}</td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
-  <br>
-  <div class="pagination">
-    {{range .links}}
-    {{if eq .Title "prev"}}
-    <a href="{{.Href}}" class="prev-link"> &lt; Prev </a>
-    {{end}}
-    {{if eq .Title "next"}}
-    <a href="{{.Href}}" class="next-link"> Next &gt; </a>
-    {{end}}
-    {{end}}
-  </div>
+    <h1>Jobs List</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Logs (JobID)</th>
+                <th>Status</th>
+                <th>ProcessID</th>
+                <th>Submitter</th>
+                <th>Updated</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .jobs}}
+            <tr>
+                <td><a href="/jobs/{{.JobID}}/logs" target="_blank">{{.JobID}}</a></td>
+                <td>
+                    {{if eq .Status "successful"}}
+                    <img src="/public/svgs/check-icon.svg" alt="successful" />
+                    {{else if eq .Status "failed"}}
+                    <img src="/public/svgs/cross-icon.svg" alt="failed" />
+                    {{else if eq .Status "dismissed"}}
+                    <img src="/public/svgs/delete-icon.svg" alt="dismissed" />
+                    {{else if or (eq .Status "accepted") (eq .Status "running")}}
+                    <img src="/public/svgs/yellow-circle-icon.svg" alt="in progress" />
+                    {{else if eq .Status "lost"}}
+                    <img src="/public/svgs/lost-icon.svg" alt="lost" />
+                    {{end}}
+                    <a href="/jobs/{{.JobID}}" target="_blank">
+                        {{.Status}}
+                    </a>
+                </td>
+                <td><a href="/processes/{{.ProcessID}}" target="_blank">{{.ProcessID}}</a></td>
+                <td>{{.Submitter}}</td>
+                <td>{{.LastUpdate.Format "2006-01-02 15:04:05 MST"}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+    <br>
+    <div class="pagination">
+        {{range .links}}
+        {{if eq .Title "prev"}}
+        <a href="{{.Href}}" class="prev-link"> &lt; Prev </a>
+        {{end}}
+        {{if eq .Title "next"}}
+        <a href="{{.Href}}" class="next-link"> Next &gt; </a>
+        {{end}}
+        {{end}}
+    </div>
 </body>
 
 </html>
