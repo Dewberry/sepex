@@ -36,7 +36,7 @@
           {{else if or (eq .Status "accepted") (eq .Status "running")}}
           <img src="/public/svgs/yellow-circle-icon.svg" alt="in progress" />
           {{else if eq .Status "lost"}}
-          <img src="/public/svgs/lost.svg" alt="lost" />
+          <img src="/public/svgs/lost-icon.svg" alt="lost" />
           {{end}}
           <a href="/jobs/{{.JobID}}" target="_blank">
             {{.Status}}
