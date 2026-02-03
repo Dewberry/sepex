@@ -162,6 +162,7 @@ func recoverDockerJobsFromRecords(
 		var j Job = job
 		activeJobs.Jobs[j.JobID()] = &j
 		job.logger.Info("Job recovered after restart. Some features might be missing")
+		job.Recovered = true
 
 		log.Infof("Recovery(docker): added to ActiveJobs job=%s running=%v exit=%d", r.JobID, info.Running, info.ExitCode)
 
@@ -338,6 +339,7 @@ func recoverAWSBatchJobsFromRecords(
 		var job Job = j
 		active.Jobs[j.JobID()] = &job
 		j.logger.Info("Job recovered after restart. Some features might be missing")
+		j.Recovered = true
 		log.Infof("Recovery(aws-batch): added to ActiveJobs job=%s aws_status=%s", r.JobID, status)
 
 		// Bring status up to date

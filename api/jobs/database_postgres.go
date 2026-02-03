@@ -49,7 +49,7 @@ func (postgresDB *PostgresDB) createTables() error {
         updated TIMESTAMP WITHOUT TIME ZONE NOT NULL,
         mode TEXT NOT NULL,
         host TEXT NOT NULL,
-				host_job_id TEXT NOT NULL DEFAULT '',
+		host_job_id TEXT NOT NULL DEFAULT '',
         process_id TEXT NOT NULL,
         submitter TEXT NOT NULL DEFAULT ''
     );

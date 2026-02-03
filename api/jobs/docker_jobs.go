@@ -386,24 +386,30 @@ func (j *DockerJob) WriteMetaData() {
 		j.logger.Errorf("Could not create controller. Error: %s", err.Error())
 	}
 
-	p := process{j.ProcessID(), j.ProcessVersionID()}
-	var i image
-	if j.IMAGE() != "" {
-		imageDigest, err := c.GetImageDigest(j.IMAGE()) // what if image is update between start of job and this call?
+	var g, s, e time.Time
+	if c == nil {
+		// best-effort metadata without timing details
+	} else {
+		g, s, e, err = c.GetJobTimes(j.ContainerID)
 		if err != nil {
-			if !j.Recovered {
-				j.logger.Errorf("Error getting Image Digest: %s", err.Error())
-				return
-			}
-		} else {
-			i = image{j.IMAGE(), imageDigest}
+			j.logger.Errorf("Error getting job times: %s", err.Error())
 		}
 	}
 
-	g, s, e, err := c.GetJobTimes(j.ContainerID)
-	if err != nil {
-		j.logger.Errorf("Error getting job times: %s", err.Error())
-		return
+	p := process{j.ProcessID(), j.ProcessVersionID()}
+	var i image
+	if j.IMAGE() != "" {
+		if c == nil {
+			i = image{ImageURI: j.IMAGE()}
+		} else {
+			imageDigest, err := c.GetImageDigest(j.IMAGE()) // what if image is update between start of job and this call?
+			if err != nil {
+				j.logger.Errorf("Error getting Image Digest: %s", err.Error())
+				i = image{ImageURI: j.IMAGE()}
+			} else {
+				i = image{j.IMAGE(), imageDigest}
+			}
+		}
 	}
 
 	repoURL := os.Getenv("REPO_URL")

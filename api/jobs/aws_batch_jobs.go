@@ -57,6 +57,7 @@ type AWSBatchJob struct {
 	StorageSvc *s3.S3
 	DoneChan   chan Job
 	Resources  // AWS Batch manages its own resources, but field needed for interface
+	Recovered  bool
 }
 
 func (j *AWSBatchJob) WaitForRunCompletion() {
@@ -407,6 +408,7 @@ func (j *AWSBatchJob) fetchCloudWatchLogs() ([]string, error) {
 }
 
 // Write metadata at the job's metadata location
+// Since recovered jobs may not have full information, we allow for incomplete metadata
 func (j *AWSBatchJob) WriteMetaData() {
 	j.logger.Info("Starting metadata writing routine.")
 	j.wg.Add(1)
@@ -416,46 +418,43 @@ func (j *AWSBatchJob) WriteMetaData() {
 	c, err := controllers.NewAWSBatchController(os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY"), os.Getenv("AWS_REGION"))
 	if err != nil {
 		j.logger.Errorf("Error writing metadata: %s", err.Error())
-		return
 	}
 
-	imgURI, err := c.GetImageURI(j.JobDef)
-	if err != nil {
-		j.logger.Errorf("Error writing metadata: %s", err.Error())
-		return
+	var imgURI string
+	if c != nil && j.JobDef != "" {
+		imgURI, err = c.GetImageURI(j.JobDef)
+		if err != nil {
+			j.logger.Errorf("Error writing metadata: %s", err.Error())
+		}
 	}
 
 	// - imgDgst would be incorrect if the tag has been updated in between
 	// - if there are multiple architectures available for the same image tag,
 	// the digest is probably for the manifest
 	var imgDgst string
-	if strings.Contains(imgURI, "amazonaws.com/") {
-		imgDgst, err = getECRImageDigest(imgURI)
-		if err != nil {
-			j.logger.Errorf("Error writing metadata: %s", err.Error())
-			return
+	if imgURI != "" {
+		switch {
+		case strings.Contains(imgURI, "amazonaws.com/"):
+			imgDgst, err = getECRImageDigest(imgURI)
+		case strings.Contains(imgURI, "ghcr.io/"):
+			imgDgst, err = getGHCRImageDigest(imgURI, "")
+		default:
+			imgDgst, err = getDkrHubImageDigest(imgURI, "dummy")
 		}
-	} else if strings.Contains(imgURI, "ghcr.io/") {
-		imgDgst, err = getGHCRImageDigest(imgURI, "")
 		if err != nil {
 			j.logger.Errorf("Error writing metadata: %s", err.Error())
-			return
-		}
-	} else {
-		imgDgst, err = getDkrHubImageDigest(imgURI, "dummy")
-		if err != nil {
-			j.logger.Errorf("Error writing metadata: %s", err.Error())
-			return
 		}
 	}
 
 	p := process{j.ProcessID(), j.ProcessVersion}
 	i := image{imgURI, imgDgst}
 
-	g, s, e, err := c.GetJobTimes(j.AWSBatchID)
-	if err != nil {
-		j.logger.Errorf("Error writing metadata: %s", err.Error())
-		return
+	var g, s, e time.Time
+	if c != nil {
+		g, s, e, err = c.GetJobTimes(j.AWSBatchID)
+		if err != nil {
+			j.logger.Errorf("Error writing metadata: %s", err.Error())
+		}
 	}
 
 	repoURL := os.Getenv("REPO_URL")
@@ -469,6 +468,9 @@ func (j *AWSBatchJob) WriteMetaData() {
 		GeneratedAtTime: g,
 		StartedAtTime:   s,
 		EndedAtTime:     e,
+	}
+	if j.Recovered {
+		md.RecoveryNotice = "Job was recovered after restart; metadata may be incomplete."
 	}
 
 	jsonBytes, err := json.Marshal(md)
