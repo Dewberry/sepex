@@ -14,13 +14,6 @@ import (
 )
 
 // RecoverAllJobs rebuilds in-memory state after an API restart.
-//
-// Design:
-// - Query DB once for all non-terminal jobs.
-// - For each job:
-//   - docker: check container state and recover.
-//   - subprocess: not recoverable and will be marked DISMISSED and write server log line.
-//   - aws-batch: query AWS for current state; if terminal then it should finalize; if running then add to ActiveJobs.
 
 func RecoverAllJobs(
 	db Database,
@@ -36,33 +29,35 @@ func RecoverAllJobs(
 		return err
 	}
 
-	// Count by host
-	var dockerCount, subprocessCount, batchCount int
+	// Partition by host in a single pass.
+	dockerRecords := make([]JobRecord, 0, len(records))
+	subprocessRecords := make([]JobRecord, 0, len(records))
+	batchRecords := make([]JobRecord, 0, len(records))
 	for _, r := range records {
 		switch r.Host {
 		case "docker":
-			dockerCount++
+			dockerRecords = append(dockerRecords, r)
 		case "subprocess":
-			subprocessCount++
+			subprocessRecords = append(subprocessRecords, r)
 		case "aws-batch":
-			batchCount++
+			batchRecords = append(batchRecords, r)
 		}
 	}
 
 	log.Infof("Recovery: found %d non-terminal jobs (docker=%d subprocess=%d aws-batch=%d)",
-		len(records), dockerCount, subprocessCount, batchCount,
+		len(records), len(dockerRecords), len(subprocessRecords), len(batchRecords),
 	)
 
 	// Run recoveries in a stable order.
-	if err := recoverDockerJobsFromRecords(db, storage, active, doneChan, resourcePool, processResources, records); err != nil {
+	if err := recoverDockerJobsFromRecords(db, storage, active, doneChan, resourcePool, processResources, dockerRecords); err != nil {
 		return fmt.Errorf("docker recovery failed: %w", err)
 	}
 
-	if err := handleSubprocessJobsFromRecords(db, storage, records); err != nil {
+	if err := handleSubprocessJobsFromRecords(db, storage, subprocessRecords); err != nil {
 		return fmt.Errorf("subprocess dismissal failed: %w", err)
 	}
 
-	if err := recoverAWSBatchJobsFromRecords(db, storage, active, doneChan, records); err != nil {
+	if err := recoverAWSBatchJobsFromRecords(db, storage, active, doneChan, batchRecords); err != nil {
 		return fmt.Errorf("aws-batch recovery failed: %w", err)
 	}
 
@@ -74,6 +69,8 @@ func RecoverAllJobs(
 // Docker recovery
 // ---------------------------
 
+// recoverDockerJobsFromRecords restores docker jobs from a filtered record set.
+// The records slice is expected to contain only docker jobs.
 func recoverDockerJobsFromRecords(
 	db Database,
 	storageSvc *s3.S3,
@@ -185,6 +182,7 @@ func recoverDockerJobsFromRecords(
 	return nil
 }
 
+// recoverRunningContainer waits for the container to exit, then finalizes the job.
 func recoverRunningContainer(j *DockerJob, dockerCtl *controllers.DockerController) {
 	defer func() {
 		if j.ResourcePool != nil {
@@ -195,10 +193,12 @@ func recoverRunningContainer(j *DockerJob, dockerCtl *controllers.DockerControll
 	finalizeRecoveredDocker(j, exitCode, err)
 }
 
+// recoverExitedContainer finalizes a recovered job with a known exit code.
 func recoverExitedContainer(j *DockerJob, exitCode int) {
 	finalizeRecoveredDocker(j, int64(exitCode), nil)
 }
 
+// finalizeRecoveredDocker updates status/metadata and closes a recovered docker job.
 func finalizeRecoveredDocker(j *DockerJob, exitCode int64, waitErr error) {
 	defer j.Close()
 	if waitErr != nil {
@@ -214,15 +214,7 @@ func finalizeRecoveredDocker(j *DockerJob, exitCode int64, waitErr error) {
 	}
 }
 
-// ---------------------------
-// Subprocess dismissal
-// ---------------------------
-
-// handleSubprocessJobsFromRecords marks any non-terminal subprocess job as DISMISSED or LOST
-// and appends a server log line explaining it was dismissed due to restart/crash.
-//
-// Subprocess jobs are intentionally not recoverable: after an API restart we cannot
-// reliably reconnect to the child process or guarantee its state.
+// The records slice is expected to contain only subprocess jobs.
 func handleSubprocessJobsFromRecords(db Database, storageSvc *s3.S3, records []JobRecord) error {
 	for _, r := range records {
 		if r.Host != "subprocess" {
@@ -251,7 +243,8 @@ func handleSubprocessJobsFromRecords(db Database, storageSvc *s3.S3, records []J
 	return nil
 }
 
-// logs must already exist on local disk
+// appendJobRecoveryMessage appends a recovery warning to the server log for the job.
+// Log file must already exist on local disk.
 func appendJobRecoveryMessage(jobID, msg string) error {
 	dir := os.Getenv("TMP_JOB_LOGS_DIR")
 	fp := filepath.Join(dir, fmt.Sprintf("%s.server.jsonl", jobID))
@@ -276,6 +269,7 @@ func appendJobRecoveryMessage(jobID, msg string) error {
 // AWS Batch recovery
 // ---------------------------
 
+// recoverAWSBatchJobsFromRecords restores AWS Batch jobs from a filtered record set.
 func recoverAWSBatchJobsFromRecords(
 	db Database,
 	storage *s3.S3,
