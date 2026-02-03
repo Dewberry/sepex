@@ -53,6 +53,7 @@ type Job interface {
 	// At this point job should be ready to be processed and added to database
 	Create() error
 
+	// Whoever is calling NewStatusUpdate with a SUCCESSFUL status must also call WriteMetaData().
 	WriteMetaData()
 	// WriteResults([]byte) error
 
@@ -85,6 +86,7 @@ type JobRecord struct {
 	ProcessID  string    `json:"processID"`
 	Type       string    `default:"process" json:"type"`
 	Host       string    `json:"host,omitempty"`
+	HostJobID  string    `json:"hostJobID,omitempty"`
 	Mode       string    `json:"mode,omitempty"`
 	Submitter  string    `json:"submitter"`
 }
@@ -140,12 +142,12 @@ const (
 	SUCCESSFUL string = "successful"
 	FAILED     string = "failed"
 	DISMISSED  string = "dismissed"
+	LOST       string = "lost"
 )
 
 // FetchResults by parsing logs
 // Assumes last log will be results always
 func FetchResults(svc *s3.S3, jid string) (interface{}, error) {
-
 	logs, err := FetchLogs(svc, jid, true)
 	if err != nil {
 		return nil, err
@@ -241,7 +243,6 @@ func FetchLogs(svc *s3.S3, jid string, onlyContainer bool) (JobLogs, error) {
 	}
 
 	for _, k := range keys {
-		// First, check locally
 
 		if k.key == "server" && onlyContainer {
 			continue
@@ -255,7 +256,7 @@ func FetchLogs(svc *s3.S3, jid string, onlyContainer bool) (JobLogs, error) {
 			continue
 		}
 
-		// If not found locally, check storage
+		// storage fallback
 		storageKey := fmt.Sprintf("%s/%s.%s.jsonl", os.Getenv("STORAGE_LOGS_PREFIX"), jid, k.key)
 		exists, err := utils.KeyExists(storageKey, svc)
 		if err != nil {
@@ -277,7 +278,7 @@ func FetchLogs(svc *s3.S3, jid string, onlyContainer bool) (JobLogs, error) {
 }
 
 // Upload log files from local disk to storage service
-func UploadLogsToStorage(svc *s3.S3, jid, pid string) {
+func UploadLogsToStorage(svc *s3.S3, jid string) {
 
 	localDir := os.Getenv("TMP_JOB_LOGS_DIR") // Local directory where logs are stored
 
@@ -301,7 +302,7 @@ func UploadLogsToStorage(svc *s3.S3, jid, pid string) {
 	}
 }
 
-func DeleteLocalLogs(svc *s3.S3, jid, pid string) {
+func DeleteLocalLogs(svc *s3.S3, jid string) {
 	localDir := os.Getenv("TMP_JOB_LOGS_DIR") // Local directory where logs are stored
 
 	// List of log types
@@ -317,4 +318,9 @@ func DeleteLocalLogs(svc *s3.S3, jid, pid string) {
 			log.Error(fmt.Sprintf("Failed to delete local file %s: %v", localPath, err))
 		}
 	}
+}
+
+func UploadLogsToStorageAndDeleteLocal(svc *s3.S3, jid string) {
+	UploadLogsToStorage(svc, jid)
+	DeleteLocalLogs(svc, jid)
 }

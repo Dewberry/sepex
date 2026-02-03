@@ -101,7 +101,7 @@ func (j *SubprocessJob) NewStatusUpdate(status string, updateTime time.Time) {
 
 	// If old status is one of the terminated status, it should not update status.
 	switch j.Status {
-	case SUCCESSFUL, DISMISSED, FAILED:
+	case SUCCESSFUL, DISMISSED, FAILED, LOST:
 		return
 	}
 
@@ -188,7 +188,8 @@ func (j *SubprocessJob) Create() error {
 	j.ctxCancel = cancelFunc
 
 	// At this point job is ready to be added to database
-	err = j.DB.addJob(j.UUID, "accepted", "", "local", j.ProcessName, j.Submitter, time.Now())
+	err = j.DB.addJob(j.UUID, "accepted", "", "subprocess", "", j.ProcessName, j.Submitter, time.Now())
+
 	if err != nil {
 		j.ctxCancel()
 		return err
@@ -258,6 +259,8 @@ func (j *SubprocessJob) Run() {
 		return
 	}
 	j.PID = fmt.Sprintf("%d", j.execCmd.Process.Pid)
+	j.DB.updateJobHostId(j.UUID, j.PID)
+
 	j.NewStatusUpdate(RUNNING, time.Time{})
 
 	// Check if job was cancelled (Kill() was called) before waiting for process
@@ -371,13 +374,13 @@ func (j *SubprocessJob) Close() {
 		go func() {
 			j.wg.Wait() // wait if other routines like metadata are running
 			j.logFile.Close()
-			UploadLogsToStorage(j.StorageSvc, j.UUID, j.ProcessName)
+			UploadLogsToStorage(j.StorageSvc, j.UUID)
 			// It is expected that logs will be requested multiple times for a recently finished job
 			// so we are waiting for one hour to before deleting the local copy
 			// so that we can avoid repetitive request to storage service.
 			// If the server shutdown, these files would need to be manually deleted
 			time.Sleep(time.Hour)
-			DeleteLocalLogs(j.StorageSvc, j.UUID, j.ProcessName)
+			DeleteLocalLogs(j.StorageSvc, j.UUID)
 		}()
 	})
 }

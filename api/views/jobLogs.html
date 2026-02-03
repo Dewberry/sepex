@@ -19,6 +19,8 @@
         <img src="/public/svgs/delete-icon.svg" alt="dismissed" />
         {{else if or (eq .Status "accepted") (eq .Status "running")}}
         <img src="/public/svgs/yellow-circle-icon.svg" alt="in progress" />
+        {{else if eq .Status "lost"}}
+        <img src="/public/svgs/lost-icon.svg" alt="lost" />
         {{end}}
     </h1>
     <h2>Process: {{.ProcessID}}</h2>

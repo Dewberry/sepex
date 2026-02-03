@@ -19,6 +19,12 @@ import (
 
 const DOCKER_NETWORK = "process_api_net"
 
+type ContainerInfo struct {
+	Exists   bool
+	Running  bool
+	ExitCode int
+}
+
 type DockerController struct {
 	cli *client.Client
 }
@@ -233,4 +239,27 @@ func (c *DockerController) GetJobTimes(containerID string) (cp time.Time, cr tim
 	}
 
 	return
+}
+
+func (c *DockerController) ContainerInfo(ctx context.Context, containerID string) (ContainerInfo, error) {
+	inspect, err := c.cli.ContainerInspect(ctx, containerID)
+	if err != nil {
+		// detect not found (docker returns errdefs.NotFound usually)
+		if strings.Contains(err.Error(), "No such container") {
+			return ContainerInfo{Exists: false}, nil
+		}
+		return ContainerInfo{}, err
+	}
+
+	running := inspect.State != nil && inspect.State.Running
+	exitCode := 0
+	if inspect.State != nil {
+		exitCode = inspect.State.ExitCode
+	}
+
+	return ContainerInfo{
+		Exists:   true,
+		Running:  running,
+		ExitCode: exitCode,
+	}, nil
 }
