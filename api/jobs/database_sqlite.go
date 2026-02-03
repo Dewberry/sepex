@@ -104,9 +104,10 @@ func (sqliteDB *SQLiteDB) addJob(jid, status, mode, host, hostJobID, processID, 
 	return nil
 }
 
-func (sqliteDB *SQLiteDB) updateJobHost(jid, host, hostJobID string) error {
-	query := `UPDATE jobs SET host = ?, host_job_id = ? WHERE id = ?`
-	_, err := sqliteDB.Handle.Exec(query, host, hostJobID, jid)
+// Update host job id of a job.
+func (sqliteDB *SQLiteDB) updateJobHostId(jid, hostJobID string) error {
+	query := `UPDATE jobs SET host_job_id = ? WHERE id = ?`
+	_, err := sqliteDB.Handle.Exec(query, hostJobID, jid)
 	return err
 }
 

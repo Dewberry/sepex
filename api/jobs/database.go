@@ -11,7 +11,7 @@ type Database interface {
 	addJob(jid, status, mode, host, hostJobID, processID, submitter string, updated time.Time) error
 	updateJobRecord(jid, status string, now time.Time) error
 
-	updateJobHost(jid, host, hostJobID string) error
+	updateJobHostId(jid, hostJobID string) error
 	GetNonTerminalJobs() ([]JobRecord, error)
 
 	GetJob(jid string) (JobRecord, bool, error)

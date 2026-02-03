@@ -33,9 +33,10 @@ func NewPostgresDB(dbConnString string) (*PostgresDB, error) {
 	return &db, nil
 }
 
-func (db *PostgresDB) updateJobHost(jid, host, hostJobID string) error {
-	query := `UPDATE jobs SET host = $2, host_job_id = $3 WHERE id = $1`
-	_, err := db.Handle.Exec(query, jid, host, hostJobID)
+// UpdateJobHostId updates the host_job_id of a job
+func (db *PostgresDB) updateJobHostId(jid, hostJobID string) error {
+	query := `UPDATE jobs SET host_job_id = $2 WHERE id = $1`
+	_, err := db.Handle.Exec(query, jid, hostJobID)
 	return err
 }
 

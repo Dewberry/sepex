@@ -259,7 +259,7 @@ func (j *SubprocessJob) Run() {
 		return
 	}
 	j.PID = fmt.Sprintf("%d", j.execCmd.Process.Pid)
-	j.DB.updateJobHost(j.UUID, "subprocess", j.PID)
+	j.DB.updateJobHostId(j.UUID, j.PID)
 
 	j.NewStatusUpdate(RUNNING, time.Time{})
 

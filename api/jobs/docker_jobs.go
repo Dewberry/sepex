@@ -323,7 +323,7 @@ func (j *DockerJob) Run() {
 	j.NewStatusUpdate(RUNNING, time.Time{})
 
 	j.ContainerID = containerID
-	j.DB.updateJobHost(j.UUID, "docker", containerID)
+	j.DB.updateJobHostId(j.UUID, containerID)
 
 	// Check if job was cancelled (Kill() was called) before waiting for container
 	select {
