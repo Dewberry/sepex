@@ -77,6 +77,7 @@ type JobRecord struct {
 	Host       string    `json:"host,omitempty"`
 	Mode       string    `json:"mode,omitempty"`
 	Submitter  string    `json:"submitter"`
+	Tags       []string  `json:"tags,omitempty"`
 }
 
 type LogEntry struct {

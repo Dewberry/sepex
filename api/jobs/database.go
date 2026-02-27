@@ -8,11 +8,11 @@ import (
 
 // Database interface abstracts database operations
 type Database interface {
-	addJob(jid, status, mode, host, processID, submitter string, updated time.Time) error
+	addJob(jid, status, mode, host, processID, submitter string, tags []string, updated time.Time) error
 	updateJobRecord(jid, status string, now time.Time) error
 	GetJob(jid string) (JobRecord, bool, error)
 	CheckJobExist(jid string) (bool, error)
-	GetJobs(limit, offset int, processIDs, statuses, submitters []string) ([]JobRecord, error)
+	GetJobs(limit, offset int, processIDs, statuses, submitters, tags []string) ([]JobRecord, error)
 	Close() error
 }
 

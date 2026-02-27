@@ -97,6 +97,7 @@ func prepareResponse(c echo.Context, httpStatus int, renderName string, output i
 // specs: https://developer.ogc.org/api/processes/index.html#tag/Execute
 type runRequestBody struct {
 	Inputs map[string]interface{} `json:"inputs"`
+	Tags   []string               `json:"tags"`
 }
 
 // LandingPage godoc
@@ -242,6 +243,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			StorageSvc:     rh.StorageSvc,
 			DB:             rh.DB,
 			DoneChan:       rh.MessageQueue.JobDone,
+			Tags:           params.Tags,
 		}
 
 	case "aws-batch":
@@ -259,6 +261,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			StorageSvc:     rh.StorageSvc,
 			DB:             rh.DB,
 			DoneChan:       rh.MessageQueue.JobDone,
+			Tags:           params.Tags,
 		}
 
 	case "subprocess":
@@ -272,6 +275,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			StorageSvc:     rh.StorageSvc,
 			DB:             rh.DB,
 			DoneChan:       rh.MessageQueue.JobDone,
+			Tags:           params.Tags,
 		}
 	}
 
@@ -574,6 +578,11 @@ func (rh *RESTHandler) ListJobsHandler(c echo.Context) error {
 	processIDs := c.QueryParam("processID") // assuming comma-separated list: "process1,process2"
 	statuses := c.QueryParam("status")
 	submitters := c.QueryParam("submitter")
+	tagsParam := c.QueryParam("tags")
+	var tagsList []string
+	if tagsParam != "" {
+		tagsList = strings.Split(tagsParam, ",")
+	}
 
 	var processIDList []string
 	if processIDs != "" {
@@ -617,7 +626,7 @@ func (rh *RESTHandler) ListJobsHandler(c echo.Context) error {
 		offset = 0
 	}
 
-	result, err := rh.DB.GetJobs(limit, offset, processIDList, statusList, submittersList)
+	result, err := rh.DB.GetJobs(limit, offset, processIDList, statusList, submittersList, tagsList)
 	if err != nil {
 		output := errResponse{HTTPStatus: http.StatusInternalServerError, Message: err.Error()}
 		return prepareResponse(c, http.StatusNotFound, "error", output)

@@ -31,9 +31,9 @@ type SubprocessJob struct {
 	EnvVars        []string
 	Cmd            []string `json:"commandOverride"`
 	UpdateTime     time.Time
-	Status         string `json:"status"`
-
-	execCmd *exec.Cmd
+	Status         string   `json:"status"`
+	Tags           []string `json:"tags"`
+	execCmd        *exec.Cmd
 
 	logger  *log.Logger
 	logFile *os.File
@@ -164,7 +164,8 @@ func (j *SubprocessJob) Create() error {
 	j.ctxCancel = cancelFunc
 
 	// At this point job is ready to be added to database
-	err = j.DB.addJob(j.UUID, "accepted", "", "local", j.ProcessName, j.Submitter, time.Now())
+	err = j.DB.addJob(j.UUID, "accepted", "", "local", j.ProcessName, j.Submitter, j.Tags, time.Now())
+
 	if err != nil {
 		j.ctxCancel()
 		return err
