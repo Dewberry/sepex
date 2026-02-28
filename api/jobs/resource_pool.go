@@ -65,6 +65,18 @@ func (rp *ResourcePool) TryReserve(cpus float32, memory int) bool {
 	return false
 }
 
+// ReserveForce increments used resources without enforcing limits.
+// This is intended for recovery to reflect already-running jobs.
+func (rp *ResourcePool) ReserveForce(cpus float32, memory int) {
+	rp.mu.Lock()
+	defer rp.mu.Unlock()
+
+	rp.usedCPUs += cpus
+	rp.usedMemory += memory
+	log.Debugf("Resources forced: cpus=%.2f, memory=%dMB. Used: cpus=%.2f/%.2f, memory=%d/%dMB",
+		cpus, memory, rp.usedCPUs, rp.maxCPUs, rp.usedMemory, rp.maxMemory)
+}
+
 // Release returns resources to the pool when a job finishes.
 func (rp *ResourcePool) Release(cpus float32, memory int) {
 	rp.mu.Lock()

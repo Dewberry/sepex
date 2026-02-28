@@ -27,6 +27,10 @@
             "@id": "@type"
         },
         "imageDigest": "aorc:hash",
-        "commands": "aorc:commands"
+        "commands": "aorc:commands",
+        "recoveryNotice": {
+            "@id": "schema:description",
+            "@type": "xsd:string"
+        }
     }
 }

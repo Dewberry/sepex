@@ -27,7 +27,7 @@ func ProcessStatusMessageUpdate(sm StatusMessage) {
 	// Multiple calls should not trigger multiple close or metadata routines
 	// A better way to achieve this would be through locks.
 	switch (*sm.Job).CurrentStatus() {
-	case SUCCESSFUL, DISMISSED, FAILED:
+	case SUCCESSFUL, DISMISSED, FAILED, LOST:
 		return
 	}
 	(*sm.Job).NewStatusUpdate(sm.Status, sm.LastUpdate)

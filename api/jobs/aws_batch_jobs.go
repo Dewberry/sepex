@@ -57,6 +57,7 @@ type AWSBatchJob struct {
 	StorageSvc *s3.S3
 	DoneChan   chan Job
 	Resources  // AWS Batch manages its own resources, but field needed for interface
+	Recovered  bool
 }
 
 func (j *AWSBatchJob) WaitForRunCompletion() {
@@ -172,7 +173,7 @@ func (j *AWSBatchJob) NewStatusUpdate(status string, updateTime time.Time) {
 
 	// If old status is one of the terminated status, it should not update status.
 	switch j.Status {
-	case SUCCESSFUL, DISMISSED, FAILED:
+	case SUCCESSFUL, DISMISSED, FAILED, LOST:
 		return
 	}
 
@@ -204,21 +205,24 @@ func (j *AWSBatchJob) Equals(job Job) bool {
 }
 
 func (j *AWSBatchJob) initLogger() error {
-	// Create a place holder file for container logs
-	file, err := os.Create(fmt.Sprintf("%s/%s.process.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
-	if err != nil {
+	// Ensure process log file exists without truncation
+	processPath := fmt.Sprintf("%s/%s.process.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID)
+	if f, err := os.OpenFile(processPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err != nil {
 		return fmt.Errorf("failed to open log file: %s", err.Error())
+	} else {
+		f.Close()
 	}
-	file.Close()
 
 	// Create logger for server logs
 	j.logger = log.New()
 
-	file, err = os.Create(fmt.Sprintf("%s/%s.server.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
+	serverPath := fmt.Sprintf("%s/%s.server.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID)
+	file, err := os.OpenFile(serverPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %s", err.Error())
 	}
 
+	j.logFile = file
 	j.logger.SetOutput(file)
 	j.logger.SetFormatter(&log.JSONFormatter{})
 
@@ -269,7 +273,7 @@ func (j *AWSBatchJob) Create() error {
 	j.batchContext = batchContext
 
 	// At this point job is ready to be added to database
-	err = j.DB.addJob(j.UUID, "accepted", "", "aws-batch", j.ProcessName, j.Submitter, time.Now())
+	err = j.DB.addJob(j.UUID, "accepted", "", "aws-batch", j.AWSBatchID, j.ProcessName, j.Submitter, time.Now())
 	if err != nil {
 		j.ctxCancel()
 		return err
@@ -404,6 +408,7 @@ func (j *AWSBatchJob) fetchCloudWatchLogs() ([]string, error) {
 }
 
 // Write metadata at the job's metadata location
+// Since recovered jobs may not have full information, we allow for incomplete metadata
 func (j *AWSBatchJob) WriteMetaData() {
 	j.logger.Info("Starting metadata writing routine.")
 	j.wg.Add(1)
@@ -413,46 +418,43 @@ func (j *AWSBatchJob) WriteMetaData() {
 	c, err := controllers.NewAWSBatchController(os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY"), os.Getenv("AWS_REGION"))
 	if err != nil {
 		j.logger.Errorf("Error writing metadata: %s", err.Error())
-		return
 	}
 
-	imgURI, err := c.GetImageURI(j.JobDef)
-	if err != nil {
-		j.logger.Errorf("Error writing metadata: %s", err.Error())
-		return
+	var imgURI string
+	if c != nil && j.JobDef != "" {
+		imgURI, err = c.GetImageURI(j.JobDef)
+		if err != nil {
+			j.logger.Errorf("Error writing metadata: %s", err.Error())
+		}
 	}
 
 	// - imgDgst would be incorrect if the tag has been updated in between
 	// - if there are multiple architectures available for the same image tag,
 	// the digest is probably for the manifest
 	var imgDgst string
-	if strings.Contains(imgURI, "amazonaws.com/") {
-		imgDgst, err = getECRImageDigest(imgURI)
-		if err != nil {
-			j.logger.Errorf("Error writing metadata: %s", err.Error())
-			return
+	if imgURI != "" {
+		switch {
+		case strings.Contains(imgURI, "amazonaws.com/"):
+			imgDgst, err = getECRImageDigest(imgURI)
+		case strings.Contains(imgURI, "ghcr.io/"):
+			imgDgst, err = getGHCRImageDigest(imgURI, "")
+		default:
+			imgDgst, err = getDkrHubImageDigest(imgURI, "dummy")
 		}
-	} else if strings.Contains(imgURI, "ghcr.io/") {
-		imgDgst, err = getGHCRImageDigest(imgURI, "")
 		if err != nil {
 			j.logger.Errorf("Error writing metadata: %s", err.Error())
-			return
-		}
-	} else {
-		imgDgst, err = getDkrHubImageDigest(imgURI, "dummy")
-		if err != nil {
-			j.logger.Errorf("Error writing metadata: %s", err.Error())
-			return
 		}
 	}
 
 	p := process{j.ProcessID(), j.ProcessVersion}
 	i := image{imgURI, imgDgst}
 
-	g, s, e, err := c.GetJobTimes(j.AWSBatchID)
-	if err != nil {
-		j.logger.Errorf("Error writing metadata: %s", err.Error())
-		return
+	var g, s, e time.Time
+	if c != nil {
+		g, s, e, err = c.GetJobTimes(j.AWSBatchID)
+		if err != nil {
+			j.logger.Errorf("Error writing metadata: %s", err.Error())
+		}
 	}
 
 	repoURL := os.Getenv("REPO_URL")
@@ -466,6 +468,9 @@ func (j *AWSBatchJob) WriteMetaData() {
 		GeneratedAtTime: g,
 		StartedAtTime:   s,
 		EndedAtTime:     e,
+	}
+	if j.Recovered {
+		md.RecoveryNotice = "Job was recovered after restart; metadata may be incomplete."
 	}
 
 	jsonBytes, err := json.Marshal(md)
@@ -497,11 +502,10 @@ func (j *AWSBatchJob) RunFinished() {
 	j.wgRun.Done()
 }
 
-// Write final logs, cancelCtx, write metadata
+// Write final logs, cancelCtx
 func (j *AWSBatchJob) Close() {
 	// to do: add panic recover to remove job from active jobs even if following panics
 	j.ctxCancel()
-
 	const maxAttempts = 5
 
 	for i := 1; i <= maxAttempts; i++ {
@@ -521,12 +525,14 @@ func (j *AWSBatchJob) Close() {
 
 	go func() {
 		j.wg.Wait() // wait if other routines like metadata are running because they can send logs
-		j.logFile.Close()
-		UploadLogsToStorage(j.StorageSvc, j.UUID, j.ProcessName)
+		if j.logFile != nil {
+			j.logFile.Close()
+		}
+		UploadLogsToStorage(j.StorageSvc, j.UUID)
 		// It is expected that logs will be requested multiple times for a recently finished job
 		// so we are waiting for one hour to before deleting the local copy
 		// so that we can avoid repetitive request to storage service
 		time.Sleep(time.Hour)
-		DeleteLocalLogs(j.StorageSvc, j.UUID, j.ProcessName)
+		DeleteLocalLogs(j.StorageSvc, j.UUID)
 	}()
 }

@@ -139,17 +139,17 @@ func (c *AWSBatchController) JobMonitor(batchID string) (string, string, error) 
 			return status, lsn, nil
 		}
 	case "SUBMITTED":
-		return "ACCCEPTED", lsn, nil
+		return "ACCEPTED", lsn, nil
 	case "PENDING":
-		return "ACCCEPTED", lsn, nil
+		return "ACCEPTED", lsn, nil
 	case "RUNNABLE":
-		return "ACCCEPTED", lsn, nil
+		return "ACCEPTED", lsn, nil
 	case "STARTING":
 		return "RUNNING", lsn, nil
 	case "RUNNING":
 		return status, lsn, nil
 	case "SUCCEEDED":
-		return status, lsn, nil
+		return "SUCCESSFUL", lsn, nil
 
 	default:
 		return "", lsn, fmt.Errorf("unrecognized status  %s", status)

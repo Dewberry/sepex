@@ -468,8 +468,8 @@ func (rh *RESTHandler) JobResultsHandler(c echo.Context) (err error) {
 			output := jobResponse{JobID: jobID, Outputs: outputs}
 			return prepareResponse(c, http.StatusOK, "jobResults", output)
 
-		case jobs.FAILED, jobs.DISMISSED:
-			output := errResponse{HTTPStatus: http.StatusNotFound, Message: "job Failed or Dismissed. Call logs route for details"}
+		case jobs.FAILED, jobs.DISMISSED, jobs.LOST:
+			output := errResponse{HTTPStatus: http.StatusNotFound, Message: "job Failed, Dismissed, or Lost. Call logs route for details"}
 			return prepareResponse(c, http.StatusNotFound, "error", output)
 
 		default:
@@ -525,8 +525,8 @@ func (rh *RESTHandler) JobMetaDataHandler(c echo.Context) (err error) {
 			}
 			return prepareResponse(c, http.StatusOK, "jobMetadata", md)
 
-		case jobs.FAILED, jobs.DISMISSED:
-			output := errResponse{HTTPStatus: http.StatusNotFound, Message: "job Failed or Dismissed. Metadata only available for successful jobs"}
+		case jobs.FAILED, jobs.DISMISSED, jobs.LOST:
+			output := errResponse{HTTPStatus: http.StatusNotFound, Message: "job Failed, Dismissed, or Lost. Metadata only available for successful jobs"}
 			return prepareResponse(c, http.StatusNotFound, "error", output)
 
 		default:
@@ -629,7 +629,7 @@ func (rh *RESTHandler) ListJobsHandler(c echo.Context) error {
 	}
 	for _, st := range statusList {
 		switch st {
-		case jobs.ACCEPTED, jobs.RUNNING, jobs.DISMISSED, jobs.FAILED, jobs.SUCCESSFUL:
+		case jobs.ACCEPTED, jobs.RUNNING, jobs.DISMISSED, jobs.FAILED, jobs.SUCCESSFUL, jobs.LOST:
 			// valid status
 		default:
 			output := errResponse{HTTPStatus: http.StatusBadRequest, Message: "One or more status values not valid"}

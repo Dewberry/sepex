@@ -30,9 +30,6 @@
 ## Scope
 - The behavior of logging is unknown for AWS Batch processes with job definitions having number of attempts more than 1.
 
-## Local-Scheduler
-
-
 ## Local Scheduler
 
 **Design decisions:**
@@ -40,6 +37,22 @@
 1. ResourceLimits calculated once at startup from flags/env vars. Dynamic reconfiguration rejected because a queued job could block forever if limits are reduced below its requirements after it was already validated and enqueued.
 
 1. ResourcePool and PendingJobs use `sync.Mutex`. Channels add complexity without benefit for simple state. Go channels use internal mutexes anyway, so performance is similar.
+
+## Recovery
+
+Recovery rebuilds in-memory state after a restart using DB non-terminal jobs.
+
+**Design decisions:**
+
+1. All non terminal jobs before restart get a log entry in logs and if recovered successfully get a note in metadata as well.
+
+1. Docker jobs that never started don't have enough data to be requeued so they are marked dismissed. Jobs whose container can't be found/accessed are marked LOST, while jobs whose container can be found and accessed are recovered.
+
+1. Subprocess jobs are not recoverable. They are marked DISMISSED if prior status is ACCEPTED, this is because we know for sure the weren't RUNNING before crash. Jobs that were RUNNING are considered LOST.
+
+1. AWS Batch recovery queries the Batch API for current state. Missing jobs are marked LOST; running jobs are re-registered in ActiveJobs; finished jobs are finalized and metadata/log handling is triggered.
+
+1. Metadata for recovered jobs will be incomplete but present.
 
 
 ## Release/Versioning/Changelog
@@ -78,7 +91,6 @@ The project uses an automated release workflow triggered by semver tags (e.g., `
    - Go to Actions tab → Release workflow → Run workflow
    - Select the tag from the dropdown
    - This is useful for re-running a release if needed
-
 
 
 
