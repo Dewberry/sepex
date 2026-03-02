@@ -9,6 +9,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Unreleased
 
+## [0.2.2] - 2025-2-28
+
 ### API
 #### POST /processes/:processID/execution
 - Execution mode now determined per OGC API - Processes Requirements 25/26: honors `Prefer: respond-async` header when process supports both modes, defaults to sync otherwise
@@ -74,7 +76,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Initial release with core API endpoints for process and job management
 
-[Unreleased]: https://github.com/Dewberry/sepex/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Dewberry/sepex/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/Dewberry/sepex/releases/tag/v0.2.2
 [0.2.1]: https://github.com/Dewberry/sepex/releases/tag/v0.2.1
 
 [0.2.0]: https://github.com/Dewberry/sepex/releases/tag/v0.2.0
