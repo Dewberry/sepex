@@ -188,7 +188,7 @@ jobs:
         run: docker load -i /tmp/container-image.tar
 
       - name: Scan container with Trivy
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.34.2
         with:
           image-ref: local-image:${{ needs.validate-release.outputs.version }}
           format: 'sarif'
