@@ -191,6 +191,9 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 	if params.Inputs == nil {
 		return c.JSON(http.StatusBadRequest, errResponse{Message: "'inputs' is required in the body of the request"})
 	}
+	if params.Tags == nil {
+		return c.JSON(http.StatusBadRequest, errResponse{Message: "'Tags' is required in the body of the request"})
+	}
 
 	err = p.VerifyInputs(params.Inputs)
 	if err != nil {
