@@ -97,7 +97,7 @@ func prepareResponse(c echo.Context, httpStatus int, renderName string, output i
 // specs: https://developer.ogc.org/api/processes/index.html#tag/Execute
 type runRequestBody struct {
 	Inputs map[string]interface{} `json:"inputs"`
-	Tags   []string               `json:"tags"`
+	Tags   []string               `json:"tags,omitempty"`
 }
 
 // LandingPage godoc
@@ -192,7 +192,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, errResponse{Message: "'inputs' is required in the body of the request"})
 	}
 	if params.Tags == nil {
-		return c.JSON(http.StatusBadRequest, errResponse{Message: "'Tags' is required in the body of the request"})
+		params.Tags = []string{} // default to empty if not provided
 	}
 
 	err = p.VerifyInputs(params.Inputs)
