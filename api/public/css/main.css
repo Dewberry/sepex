@@ -24,8 +24,12 @@
     --log-error: var(--status-server-error-color);
     --log-debug: #007BFF;
     --log-info: green;
+
+    --bar-used-color: #4caf50;
+    --bar-queued-color: #ff9800;
 }
 
+/* overwrite for dark mode */
 @media (prefers-color-scheme: dark) {
     :root {
         --font-color: #FFF;
@@ -214,4 +218,88 @@ code[class*="language-"] {
 
 .footer-bar a {
     font-family: monospace;
+}
+
+/* Resource Status Bars */
+.resource-section {
+    margin: 25px 0;
+    max-width: 600px;
+}
+
+.resource-label {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.resource-label-secondary {
+    font-size: 0.9em;
+    color: var(--font-color-gray);
+    margin-top: 10px;
+    margin-bottom: 5px;
+}
+
+.bar-container {
+    background-color: var(--table-row-even-bg);
+    border-radius: 4px;
+    height: 24px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--table-border-color);
+}
+
+.bar-queued-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.bar-used {
+    background-color: var(--bar-used-color);
+    height: 100%;
+    position: absolute;
+    left: 0;
+    border-radius: 3px 0 0 3px;
+}
+
+.bar-queued {
+    background-color: var(--bar-queued-color);
+    height: 18px;
+    border-radius: 3px;
+    border: 1px solid var(--table-border-color);
+}
+
+.bar-queued-full {
+    width: 100%;
+}
+
+.resource-legend {
+    margin-top: 30px;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.legend-box {
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+    border: 1px solid var(--table-border-color);
+}
+
+.legend-used {
+    background-color: var(--bar-used-color);
+}
+
+.legend-queued {
+    background-color: var(--bar-queued-color);
+}
+
+.legend-available {
+    background-color: var(--table-row-even-bg);
 }

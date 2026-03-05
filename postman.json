@@ -1,6 +1,6 @@
 {
 	"info": {
-		"_postman_id": "b406764c-f047-4887-81df-f3bba74571d3",
+		"_postman_id": "c4d26f8c-50f5-4f4c-86c9-2aef531bc9a8",
 		"name": "sepex",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "36773789"
@@ -597,6 +597,10 @@
 			]
 		},
 		{
+			"name": "admin",
+			"item": []
+		},
+		{
 			"name": "conformance",
 			"request": {
 				"method": "GET",
@@ -1053,7 +1057,7 @@
 				"type": "text/javascript",
 				"exec": [
 					"pm.request.headers.add({",
-					"    key: 'X-ProcessAPI-User-Email',",
+					"    key: 'X-SEPEX-User-Email',",
 					"    value: pm.variables.get('auth_username')",
 					"});"
 				]

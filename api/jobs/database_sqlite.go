@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     updated TIMESTAMP NOT NULL,
     mode TEXT NOT NULL,
     host TEXT NOT NULL,
+		host_job_id TEXT NOT NULL DEFAULT '',
     process_id TEXT NOT NULL,
     submitter TEXT NOT NULL DEFAULT '',
     tags TEXT NOT NULL DEFAULT '',
@@ -92,14 +93,20 @@ CREATE TABLE IF NOT EXISTS jobs (
 	if err != nil {
 		return fmt.Errorf("error creating tables: %s", err)
 	}
-
 	return nil
 }
 
 // Add job to the database. Will return error if job exist.
-func (sqliteDB *SQLiteDB) addJob(jid, status, mode, host, processID, submitter string, tags []string, macID string, updated time.Time) error {
-	query := `INSERT INTO jobs (id, status, updated, mode, host, process_id, submitter, tags, macID) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := sqliteDB.Handle.Exec(query, jid, status, updated, mode, host, processID, submitter, joinTags(tags), macID)
+func (sqliteDB *SQLiteDB) addJob(jid, status, mode, host, hostJobID, processID, submitter string, tags []string, macID string, updated time.Time) error {
+	query := `INSERT INTO jobs (id, status, updated, mode, host, host_job_id, process_id, submitter, tags, macID) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	_, err := sqliteDB.Handle.Exec(query, jid, status, updated, mode, host, hostJobID, processID, submitter, joinTags(tags), macID)
+	return err
+}
+
+// Update host job id of a job.
+func (sqliteDB *SQLiteDB) updateJobHostId(jid, hostJobID string) error {
+	query := `UPDATE jobs SET host_job_id = ? WHERE id = ?`
+	_, err := sqliteDB.Handle.Exec(query, hostJobID, jid)
 	return err
 }
 
@@ -121,7 +128,7 @@ func (sqliteDB *SQLiteDB) GetJob(jid string) (JobRecord, bool, error) {
 	jr := JobRecord{}
 	var tagsStr string
 	row := sqliteDB.Handle.QueryRow(query, jid)
-	err := row.Scan(&jr.JobID, &jr.Status, &jr.LastUpdate, &jr.Mode, &jr.Host, &jr.ProcessID, &jr.Submitter, &tagsStr, &jr.MacID)
+	err := row.Scan(&jr.JobID, &jr.Status, &jr.LastUpdate, &jr.Mode, &jr.Host, &jr.HostJobID, &jr.ProcessID, &jr.Submitter, &tagsStr, &jr.MacID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return JobRecord{}, false, nil
@@ -218,4 +225,37 @@ func (sqliteDB *SQLiteDB) GetJobs(limit, offset int, processIDs, statuses, submi
 
 func (sqliteDB *SQLiteDB) Close() error {
 	return sqliteDB.Handle.Close()
+}
+
+func (sqliteDB *SQLiteDB) GetNonTerminalJobs() ([]JobRecord, error) {
+	query := `
+        SELECT id, status, updated, mode, host, host_job_id, process_id, submitter
+        FROM jobs
+        WHERE status NOT IN ('successful','failed','dismissed','lost')
+        ORDER BY updated DESC
+    `
+	rows, err := sqliteDB.Handle.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := []JobRecord{}
+	for rows.Next() {
+		var r JobRecord
+		if err := rows.Scan(
+			&r.JobID,
+			&r.Status,
+			&r.LastUpdate,
+			&r.Mode,
+			&r.Host,
+			&r.HostJobID,
+			&r.ProcessID,
+			&r.Submitter,
+		); err != nil {
+			return nil, err
+		}
+		res = append(res, r)
+	}
+	return res, rows.Err()
 }

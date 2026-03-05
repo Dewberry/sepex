@@ -23,6 +23,8 @@ type DockerJob struct {
 	wg sync.WaitGroup
 	// Used for monitoring running complete for sync jobs
 	wgRun sync.WaitGroup
+	// closeOnce ensures Close() body executes exactly once
+	closeOnce sync.Once
 
 	UUID           string `json:"jobID"`
 	ContainerID    string
@@ -41,9 +43,12 @@ type DockerJob struct {
 	MacID          string `json:"macID"`
 
 	Resources
-	DB         Database
-	StorageSvc *s3.S3
-	DoneChan   chan Job
+	DB           Database
+	StorageSvc   *s3.S3
+	DoneChan     chan Job
+	ResourcePool *ResourcePool
+	IsSync       bool
+	Recovered    bool
 }
 
 func (j *DockerJob) WaitForRunCompletion() {
@@ -74,11 +79,15 @@ func (j *DockerJob) IMAGE() string {
 	return j.Image
 }
 
+func (j *DockerJob) GetResources() Resources {
+	return j.Resources
+}
+
 // Update container logs
 func (j *DockerJob) UpdateProcessLogs() (err error) {
 	// If old status is one of the terminated status, close has already been called and container logs fetched, container killed
 	switch j.Status {
-	case SUCCESSFUL, DISMISSED, FAILED:
+	case SUCCESSFUL, DISMISSED, FAILED, LOST:
 		return
 	}
 
@@ -143,7 +152,7 @@ func (j *DockerJob) NewStatusUpdate(status string, updateTime time.Time) {
 
 	// If old status is one of the terminated status, it should not update status.
 	switch j.Status {
-	case SUCCESSFUL, DISMISSED, FAILED:
+	case SUCCESSFUL, DISMISSED, FAILED, LOST:
 		return
 	}
 
@@ -175,21 +184,24 @@ func (j *DockerJob) Equals(job Job) bool {
 }
 
 func (j *DockerJob) initLogger() error {
-	// Create a place holder file for container logs
-	file, err := os.Create(fmt.Sprintf("%s/%s.process.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
-	if err != nil {
+	// Ensure process log file exists without truncation
+	processPath := fmt.Sprintf("%s/%s.process.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID)
+	if f, err := os.OpenFile(processPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err != nil {
 		return fmt.Errorf("failed to open log file: %s", err.Error())
+	} else {
+		f.Close()
 	}
-	file.Close()
 
 	// Create logger for server logs
 	j.logger = log.New()
 
-	file, err = os.Create(fmt.Sprintf("%s/%s.server.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
+	serverPath := fmt.Sprintf("%s/%s.server.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID)
+	file, err := os.OpenFile(serverPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %s", err.Error())
 	}
 
+	j.logFile = file
 	j.logger.SetOutput(file)
 	j.logger.SetFormatter(&log.JSONFormatter{})
 
@@ -203,6 +215,21 @@ func (j *DockerJob) initLogger() error {
 }
 
 func (j *DockerJob) Create() error {
+	// Only reserve resources for sync jobs at creation time
+	// Async jobs will have resources reserved when QueueWorker starts them
+	if j.IsSync {
+		if !j.ResourcePool.TryReserve(j.Resources.CPUs, j.Resources.Memory) {
+			return fmt.Errorf("resources unavailable")
+		}
+	}
+
+	// Track if creation succeeded to handle cleanup on error
+	success := false
+	defer func() {
+		if !success && j.IsSync {
+			j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory)
+		}
+	}()
 
 	err := j.initLogger()
 	if err != nil {
@@ -215,38 +242,42 @@ func (j *DockerJob) Create() error {
 	j.ctxCancel = cancelFunc
 
 	// At this point job is ready to be added to database
-	err = j.DB.addJob(j.UUID, "accepted", "", "local", j.ProcessName, j.Submitter, j.Tags, j.MacID, time.Now())
+	err = j.DB.addJob(j.UUID, "accepted", "", "docker", "", j.ProcessName, j.Submitter, j.Tags, j.MacID, time.Now())
 	if err != nil {
 		j.ctxCancel()
 		return err
 	}
 
 	j.NewStatusUpdate(ACCEPTED, time.Time{})
+
+	// Increment wgRun here so WaitForRunCompletion() blocks
+	// even if QueueWorker hasn't called StartRun() yet
 	j.wgRun.Add(1)
-	go j.Run()
+
+	success = true
 	return nil
 }
 
+func (j *DockerJob) IsSyncJob() bool {
+	return j.IsSync
+}
+
 func (j *DockerJob) Run() {
-
-	// Helper function to check if context is cancelled.
-	isCancelled := func() bool {
-		select {
-		case <-j.ctx.Done():
-			j.logger.Info("Context cancelled.")
-			return true
-		default:
-			return false
-		}
-	}
-
-	// defers are executed in LIFO order
-	// swap the order of following if results are posted/written by the container, and run close as a coroutine
-	defer j.wgRun.Done()
+	// Single consolidated defer for all cleanup operations.
+	// Order of operations:
+	//   1. Recover from panic (if any) and mark job as FAILED
+	//   2. Release resources - free CPU/memory for next job in queue
+	//   3. Close() - cleanup process, logs, remove from ActiveJobs
+	//      (closeOnce guarantees this only executes once, even if Kill() also called Close())
+	//   4. wgRun.Done() - unblock sync job waiters after results are available
 	defer func() {
-		if !isCancelled() {
-			j.Close()
+		if r := recover(); r != nil {
+			j.logger.Errorf("Run() panicked: %v", r)
+			j.NewStatusUpdate(FAILED, time.Time{})
 		}
+		j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory)
+		j.Close()
+		j.wgRun.Done()
 	}()
 
 	c, err := controllers.NewDockerController()
@@ -293,9 +324,13 @@ func (j *DockerJob) Run() {
 	j.NewStatusUpdate(RUNNING, time.Time{})
 
 	j.ContainerID = containerID
+	j.DB.updateJobHostId(j.UUID, containerID)
 
-	if isCancelled() {
+	// Check if job was cancelled (Kill() was called) before waiting for container
+	select {
+	case <-j.ctx.Done():
 		return
+	default:
 	}
 
 	// wait for process to finish
@@ -331,9 +366,12 @@ func (j *DockerJob) Kill() error {
 	// If a dismiss status is updated the job is considered dismissed at this point
 	// Close being graceful or not does not matter.
 
-	defer func() {
-		go j.Close()
-	}()
+	// Cancel context to signal Run() to exit early if still executing.
+	// Close() is safe to call from both here and Run()'s defer because
+	// closeOnce guarantees the cleanup body executes exactly once.
+	j.ctxCancel()
+
+	go j.Close()
 	return nil
 }
 
@@ -349,19 +387,30 @@ func (j *DockerJob) WriteMetaData() {
 		j.logger.Errorf("Could not create controller. Error: %s", err.Error())
 	}
 
-	p := process{j.ProcessID(), j.ProcessVersionID()}
-	imageDigest, err := c.GetImageDigest(j.IMAGE()) // what if image is update between start of job and this call?
-	if err != nil {
-		j.logger.Errorf("Error getting Image Digest: %s", err.Error())
-		return
+	var g, s, e time.Time
+	if c == nil {
+		// best-effort metadata without timing details
+	} else {
+		g, s, e, err = c.GetJobTimes(j.ContainerID)
+		if err != nil {
+			j.logger.Errorf("Error getting job times: %s", err.Error())
+		}
 	}
 
-	i := image{j.IMAGE(), imageDigest}
-
-	g, s, e, err := c.GetJobTimes(j.ContainerID)
-	if err != nil {
-		j.logger.Errorf("Error getting job times: %s", err.Error())
-		return
+	p := process{j.ProcessID(), j.ProcessVersionID()}
+	var i image
+	if j.IMAGE() != "" {
+		if c == nil {
+			i = image{ImageURI: j.IMAGE()}
+		} else {
+			imageDigest, err := c.GetImageDigest(j.IMAGE()) // what if image is update between start of job and this call?
+			if err != nil {
+				j.logger.Errorf("Error getting Image Digest: %s", err.Error())
+				i = image{ImageURI: j.IMAGE()}
+			} else {
+				i = image{j.IMAGE(), imageDigest}
+			}
+		}
 	}
 
 	repoURL := os.Getenv("REPO_URL")
@@ -375,6 +424,9 @@ func (j *DockerJob) WriteMetaData() {
 		GeneratedAtTime: g,
 		StartedAtTime:   s,
 		EndedAtTime:     e,
+	}
+	if j.Recovered {
+		md.RecoveryNotice = "Job was recovered after restart; metadata may be incomplete."
 	}
 
 	jsonBytes, err := json.Marshal(md)
@@ -424,60 +476,68 @@ func (j *DockerJob) RunFinished() {
 
 // Write final logs, cancelCtx
 func (j *DockerJob) Close() {
+	// closeOnce.Do() ensures this cleanup runs exactly once, even if Close() is called
+	// multiple times concurrently. This allows for easier development.
+	//
+	// How sync.Once works:
+	//   - First caller: acquires internal lock, executes the function, marks done
+	//   - Concurrent/subsequent callers: see done flag, return immediately without executing
+	j.closeOnce.Do(func() {
+		j.logger.Info("Starting closing routine.")
+		j.ctxCancel() // Signal Run function to terminate if running
 
-	j.logger.Info("Starting closing routine.")
-	// to do: add panic recover to remove job from active jobs even if following panics
-	j.ctxCancel() // Signal Run function to terminate if running
-
-	if j.ContainerID != "" { // Container related cleanups if container exists
-		c, err := controllers.NewDockerController()
-		if err != nil {
-			j.logger.Errorf("Could not create controller. Error: %s", err.Error())
-		} else {
-			containerLogs, err := c.ContainerLog(context.TODO(), j.ContainerID)
+		if j.ContainerID != "" { // Container related cleanups if container exists
+			c, err := controllers.NewDockerController()
 			if err != nil {
-				j.logger.Errorf("Could not fetch container logs. Error: %s", err.Error())
-			}
-
-			file, err := os.Create(fmt.Sprintf("%s/%s.process.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
-			if err != nil {
-				j.logger.Errorf("Could not create process logs file. Error: %s", err.Error())
-				return
-			}
-
-			writer := bufio.NewWriter(file)
-
-			for i, line := range containerLogs {
-				if i != len(containerLogs)-1 {
-					_, err = writer.WriteString(line + "\n")
-				} else {
-					_, err = writer.WriteString(line)
-				}
+				j.logger.Errorf("Could not create controller. Error: %s", err.Error())
+			} else {
+				containerLogs, err := c.ContainerLog(context.TODO(), j.ContainerID)
 				if err != nil {
-					j.logger.Errorf("Could not write log %s to file.", line)
+					j.logger.Errorf("Could not fetch container logs. Error: %s", err.Error())
 				}
-			}
 
-			writer.Flush()
-			file.Close()
+				file, err := os.Create(fmt.Sprintf("%s/%s.process.jsonl", os.Getenv("TMP_JOB_LOGS_DIR"), j.UUID))
+				if err != nil {
+					j.logger.Errorf("Could not create process logs file. Error: %s", err.Error())
+					return
+				}
 
-			err = c.ContainerRemove(context.TODO(), j.ContainerID)
-			if err != nil {
-				j.logger.Errorf("Could not remove container. Error: %s", err.Error())
+				writer := bufio.NewWriter(file)
+
+				for i, line := range containerLogs {
+					if i != len(containerLogs)-1 {
+						_, err = writer.WriteString(line + "\n")
+					} else {
+						_, err = writer.WriteString(line)
+					}
+					if err != nil {
+						j.logger.Errorf("Could not write log %s to file.", line)
+					}
+				}
+
+				writer.Flush()
+				file.Close()
+
+				err = c.ContainerRemove(context.TODO(), j.ContainerID)
+				if err != nil {
+					j.logger.Errorf("Could not remove container. Error: %s", err.Error())
+				}
 			}
 		}
-	}
-	j.DoneChan <- j // At this point job can be safely removed from active jobs
+		j.DoneChan <- j // At this point job can be safely removed from active jobs
 
-	go func() {
-		j.wg.Wait() // wait if other routines like metadata are running
-		j.logFile.Close()
-		UploadLogsToStorage(j.StorageSvc, j.UUID, j.ProcessName)
-		// It is expected that logs will be requested multiple times for a recently finished job
-		// so we are waiting for one hour to before deleting the local copy
-		// so that we can avoid repetitive request to storage service.
-		// If the server shutdown, these files would need to be manually deleted
-		time.Sleep(time.Hour)
-		DeleteLocalLogs(j.StorageSvc, j.UUID, j.ProcessName)
-	}()
+		go func() {
+			j.wg.Wait() // wait if other routines like metadata are running
+			if j.logFile != nil {
+				j.logFile.Close()
+			}
+			UploadLogsToStorage(j.StorageSvc, j.UUID)
+			// It is expected that logs will be requested multiple times for a recently finished job
+			// so we are waiting for one hour to before deleting the local copy
+			// so that we can avoid repetitive request to storage service.
+			// If the server shutdown, these files would need to be manually deleted
+			time.Sleep(time.Hour)
+			DeleteLocalLogs(j.StorageSvc, j.UUID)
+		}()
+	})
 }

@@ -1,0 +1,86 @@
+{{define "resourceStatus"}}
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="icon" href="/public/img/favicon-32x32.png">
+    <title>Resource Status</title>
+    <link rel="stylesheet" href="/public/css/main.css">
+</head>
+
+<body>
+    <h1>Resource Status</h1>
+
+    <div class="resource-section">
+        <div class="resource-label">CPUs ({{printf "%.2f" .resources.UsedCPUs}} / {{printf "%.2f" .resources.MaxCPUs}}) - {{printf "%.1f" .resources.UsedCPUsPct}}% utilized</div>
+        <div class="bar-container">
+            <div class="bar-used" style="width: {{if gt .resources.UsedCPUsPct 100.0}}100{{else}}{{printf "%.1f" .resources.UsedCPUsPct}}{{end}}%;"></div>
+        </div>
+    </div>
+
+    <div class="resource-section">
+        <div class="resource-label">Memory ({{.resources.UsedMemory}} / {{.resources.MaxMemory}} MB) - {{printf "%.1f" .resources.UsedMemPct}}% utilized</div>
+        <div class="bar-container">
+            <div class="bar-used" style="width: {{if gt .resources.UsedMemPct 100.0}}100{{else}}{{printf "%.1f" .resources.UsedMemPct}}{{end}}%;"></div>
+        </div>
+    </div>
+
+    <div class="resource-legend">
+        <div class="legend-item">
+            <div class="legend-box legend-used"></div>
+            <span>Used (running jobs)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-box legend-available"></div>
+            <span>Available</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-box legend-queued"></div>
+            <span>Queued (waiting jobs)</span>
+        </div>
+    </div>
+
+    <div class="resource-section">
+        <div class="resource-label-secondary">Queued CPUs: {{printf "%.2f" .resources.QueuedCPUs}} ({{printf "%.1f" .resources.QueuedCPUsPct}}% of capacity)</div>
+        <div class="bar-queued-stack" id="cpu-queued-stack" data-pct="{{printf "%.1f" .resources.QueuedCPUsPct}}"></div>
+    </div>
+
+    <div class="resource-section">
+        <div class="resource-label-secondary">Queued Memory: {{.resources.QueuedMemory}} MB ({{printf "%.1f" .resources.QueuedMemPct}}% of capacity)</div>
+        <div class="bar-queued-stack" id="mem-queued-stack" data-pct="{{printf "%.1f" .resources.QueuedMemPct}}"></div>
+    </div>
+
+    <script>
+        window.addEventListener('load', function() {
+            function createStackedBars(containerId) {
+                const container = document.getElementById(containerId);
+                const pct = parseFloat(container.dataset.pct);
+
+                if (pct <= 0) return;
+
+                const fullBars = Math.floor(pct / 100);
+                const partialPct = pct % 100;
+
+                for (let i = 0; i < fullBars; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'bar-queued bar-queued-full';
+                    container.appendChild(bar);
+                }
+
+                if (partialPct > 0) {
+                    const bar = document.createElement('div');
+                    bar.className = 'bar-queued bar-queued-partial';
+                    bar.style.width = partialPct + '%';
+                    container.appendChild(bar);
+                }
+            }
+
+            createStackedBars('cpu-queued-stack');
+            createStackedBars('mem-queued-stack');
+        });
+    </script>
+</body>
+
+</html>
+{{end}}

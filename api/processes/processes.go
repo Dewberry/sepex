@@ -227,13 +227,22 @@ func MarshallProcess(f string) (Process, error) {
 		p.Host.Image = jdi.Image
 		p.Config.Resources.Memory = jdi.Memory // although we are fetching this information but is not being used anywhere or reported to users
 		p.Config.Resources.CPUs = jdi.VCPUs    // although we are fetching this information but is not being used anywhere or reported to users
+	case "docker", "subprocess":
+		// Set default resources if not specified in config
+		if p.Config.Resources.CPUs == 0 {
+			p.Config.Resources.CPUs = 1.0
+		}
+		if p.Config.Resources.Memory == 0 {
+			p.Config.Resources.Memory = 512
+		}
 	}
 
 	return p, nil
 }
 
-// Load all processes from yml files in the given directory and subdirectories
-func LoadProcesses(dir string) (ProcessList, error) {
+// Load all processes from yml files in the given directory and subdirectories.
+// maxCPUs and maxMemory are resource limits for validating docker/subprocess processes.
+func LoadProcesses(dir string, maxCPUs float32, maxMemory int) (ProcessList, error) {
 	var pl ProcessList
 
 	ymls, err := filepath.Glob(fmt.Sprintf("%s/*/*.yml", dir))
@@ -253,7 +262,7 @@ func LoadProcesses(dir string) (ProcessList, error) {
 			log.Errorf("could not register process %s Error: %v", filepath.Base(y), err)
 			continue
 		}
-		err = p.Validate()
+		err = p.Validate(maxCPUs, maxMemory)
 		if err != nil {
 			log.Errorf("could not register process %s Error: %v", filepath.Base(y), err.Error())
 			continue
@@ -273,7 +282,9 @@ func LoadProcesses(dir string) (ProcessList, error) {
 }
 
 // Validate checks if the Process has all required fields properly set.
-func (p *Process) Validate() error {
+// maxCPUs and maxMemory are the resource limits for local job scheduling.
+// Pass 0 for both to skip resource limit validation.
+func (p *Process) Validate(maxCPUs float32, maxMemory int) error {
 	if p.Info.ID == "" {
 		return errors.New("process ID is required")
 	}
@@ -340,6 +351,16 @@ func (p *Process) Validate() error {
 
 		if err := p.EnsureLocalVolumes(); err != nil {
 			return fmt.Errorf("error: %v", err)
+		}
+	}
+
+	// Validate resource limits for local job types (docker/subprocess)
+	if p.Host.Type == "docker" || p.Host.Type == "subprocess" {
+		if maxCPUs > 0 && p.Config.Resources.CPUs > maxCPUs {
+			return fmt.Errorf("process requires %.2f CPUs but max allowed is %.2f", p.Config.Resources.CPUs, maxCPUs)
+		}
+		if maxMemory > 0 && p.Config.Resources.Memory > maxMemory {
+			return fmt.Errorf("process requires %dMB memory but max allowed is %dMB", p.Config.Resources.Memory, maxMemory)
 		}
 	}
 
