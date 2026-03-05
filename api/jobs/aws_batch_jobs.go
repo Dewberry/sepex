@@ -38,7 +38,8 @@ type AWSBatchJob struct {
 	UpdateTime     time.Time
 	Status         string `json:"status"`
 	// results       interface{}
-
+	Tags    []string `json:"tags"`
+	MacID   string   `json:"macID"`
 	logger  *log.Logger
 	logFile *os.File
 
@@ -273,7 +274,7 @@ func (j *AWSBatchJob) Create() error {
 	j.batchContext = batchContext
 
 	// At this point job is ready to be added to database
-	err = j.DB.addJob(j.UUID, "accepted", "", "aws-batch", j.AWSBatchID, j.ProcessName, j.Submitter, time.Now())
+	err = j.DB.addJob(j.UUID, "accepted", "", "aws-batch", j.AWSBatchID, j.ProcessName, j.Submitter, j.Tags, j.MacID, time.Now())
 	if err != nil {
 		j.ctxCancel()
 		return err

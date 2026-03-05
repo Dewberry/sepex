@@ -36,10 +36,11 @@ type DockerJob struct {
 	Volumes        []string `json:"volumes"`
 	Cmd            []string `json:"commandOverride"`
 	UpdateTime     time.Time
-	Status         string `json:"status"`
-
-	logger  *log.Logger
-	logFile *os.File
+	Status         string   `json:"status"`
+	Tags           []string `json:"tags"`
+	logger         *log.Logger
+	logFile        *os.File
+	MacID          string `json:"macID"`
 
 	Resources
 	DB           Database
@@ -241,7 +242,7 @@ func (j *DockerJob) Create() error {
 	j.ctxCancel = cancelFunc
 
 	// At this point job is ready to be added to database
-	err = j.DB.addJob(j.UUID, "accepted", "", "docker", "", j.ProcessName, j.Submitter, time.Now())
+	err = j.DB.addJob(j.UUID, "accepted", "", "docker", "", j.ProcessName, j.Submitter, j.Tags, j.MacID, time.Now())
 	if err != nil {
 		j.ctxCancel()
 		return err
