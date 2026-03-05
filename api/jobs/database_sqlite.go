@@ -124,7 +124,7 @@ func (sqliteDB *SQLiteDB) updateJobRecord(jid, status string, now time.Time) err
 // If job do not exists, or error encountered bool would be false.
 // Similar behavior as key exist in hashmap.
 func (sqliteDB *SQLiteDB) GetJob(jid string) (JobRecord, bool, error) {
-	query := `SELECT id, status, updated, mode, host, process_id, submitter, tags, macID FROM jobs WHERE id = ?`
+	query := `SELECT id, status, updated, mode, host, host_job_id, process_id, submitter, tags, macID FROM jobs WHERE id = ?`
 	jr := JobRecord{}
 	var tagsStr string
 	row := sqliteDB.Handle.QueryRow(query, jid)
