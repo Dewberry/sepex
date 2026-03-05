@@ -75,7 +75,7 @@ func (postgresDB *PostgresDB) createTables() error {
 
 // AddJob adds a new job to the database
 func (db *PostgresDB) addJob(jid, status, mode, host, hostJobID, processID, submitter string, tags []string, macID string, updated time.Time) error {
-	query := `INSERT INTO jobs (id, status, updated, mode, host, host_job_id, process_id, submitter, tags, macID) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9)`
+	query := `INSERT INTO jobs (id, status, updated, mode, host, host_job_id, process_id, submitter, tags, macID) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
 	_, err := db.Handle.Exec(query, jid, status, updated, mode, host, hostJobID, processID, submitter, pq.Array(tags), macID)
 	return err
 }
