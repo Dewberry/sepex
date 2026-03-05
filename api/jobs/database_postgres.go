@@ -46,7 +46,8 @@ func (postgresDB *PostgresDB) createTables() error {
 				host TEXT NOT NULL,
 				process_id TEXT NOT NULL,
 				submitter TEXT NOT NULL DEFAULT '',
-				tags TEXT[] NOT NULL DEFAULT '{}'
+				tags TEXT[] NOT NULL DEFAULT '{}',
+				macID TEXT NOT NULL DEFAULT ''
 		);
     CREATE INDEX IF NOT EXISTS idx_jobs_updated ON jobs(updated);
     CREATE INDEX IF NOT EXISTS idx_jobs_process_id ON jobs(process_id);
@@ -60,9 +61,9 @@ func (postgresDB *PostgresDB) createTables() error {
 }
 
 // AddJob adds a new job to the database
-func (db *PostgresDB) addJob(jid, status, mode, host, processID, submitter string, tags []string, updated time.Time) error {
-	query := `INSERT INTO jobs (id, status, updated, mode, host, process_id, submitter, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
-	_, err := db.Handle.Exec(query, jid, status, updated, mode, host, processID, submitter, pq.Array(tags))
+func (db *PostgresDB) addJob(jid, status, mode, host, processID, submitter string, tags []string, macID string, updated time.Time) error {
+	query := `INSERT INTO jobs (id, status, updated, mode, host, process_id, submitter, tags, macID) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+	_, err := db.Handle.Exec(query, jid, status, updated, mode, host, processID, submitter, pq.Array(tags), macID)
 	return err
 }
 
@@ -75,10 +76,10 @@ func (db *PostgresDB) updateJobRecord(jid, status string, now time.Time) error {
 
 // GetJob retrieves a job record by id
 func (db *PostgresDB) GetJob(jid string) (JobRecord, bool, error) {
-	query := `SELECT id, status, updated, mode, host, process_id, submitter, tags FROM jobs WHERE id = $1`
+	query := `SELECT id, status, updated, mode, host, process_id, submitter, tags, macID FROM jobs WHERE id = $1`
 	var jr JobRecord
 	err := db.Handle.QueryRow(query, jid).Scan(
-		&jr.JobID, &jr.Status, &jr.LastUpdate, &jr.Mode, &jr.Host, &jr.ProcessID, &jr.Submitter, pq.Array(&jr.Tags),
+		&jr.JobID, &jr.Status, &jr.LastUpdate, &jr.Mode, &jr.Host, &jr.ProcessID, &jr.Submitter, pq.Array(&jr.Tags), &jr.MacID,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -104,8 +105,8 @@ func (db *PostgresDB) CheckJobExist(jid string) (bool, error) {
 }
 
 // Assumes query parameters are valid
-func (pgDB *PostgresDB) GetJobs(limit, offset int, processIDs, statuses, submitters, tags []string) ([]JobRecord, error) {
-	baseQuery := `SELECT id, status, updated, process_id, submitter, tags FROM jobs`
+func (pgDB *PostgresDB) GetJobs(limit, offset int, processIDs, statuses, submitters, tags []string, macID string) ([]JobRecord, error) {
+	baseQuery := `SELECT id, status, updated, process_id, submitter, tags, macID FROM jobs`
 	whereClauses := []string{}
 	args := []interface{}{}
 	argIndex := 1
@@ -166,7 +167,7 @@ func (pgDB *PostgresDB) GetJobs(limit, offset int, processIDs, statuses, submitt
 	res := []JobRecord{}
 	for rows.Next() {
 		var r JobRecord
-		if err := rows.Scan(&r.JobID, &r.Status, &r.LastUpdate, &r.ProcessID, &r.Submitter, pq.Array(&r.Tags)); err != nil {
+		if err := rows.Scan(&r.JobID, &r.Status, &r.LastUpdate, &r.ProcessID, &r.Submitter, pq.Array(&r.Tags), &r.MacID); err != nil {
 			return nil, err
 		}
 		res = append(res, r)

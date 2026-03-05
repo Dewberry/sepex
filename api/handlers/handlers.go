@@ -98,6 +98,7 @@ func prepareResponse(c echo.Context, httpStatus int, renderName string, output i
 type runRequestBody struct {
 	Inputs map[string]interface{} `json:"inputs"`
 	Tags   []string               `json:"tags,omitempty"`
+	MacID  string                 `json:"macID,omitempty"`
 }
 
 // LandingPage godoc
@@ -247,6 +248,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			DB:             rh.DB,
 			DoneChan:       rh.MessageQueue.JobDone,
 			Tags:           params.Tags,
+			MacID:          params.MacID,
 		}
 
 	case "aws-batch":
@@ -265,6 +267,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			DB:             rh.DB,
 			DoneChan:       rh.MessageQueue.JobDone,
 			Tags:           params.Tags,
+			MacID:          params.MacID,
 		}
 
 	case "subprocess":
@@ -279,6 +282,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			DB:             rh.DB,
 			DoneChan:       rh.MessageQueue.JobDone,
 			Tags:           params.Tags,
+			MacID:          params.MacID,
 		}
 	}
 
@@ -586,6 +590,7 @@ func (rh *RESTHandler) ListJobsHandler(c echo.Context) error {
 	if tagsParam != "" {
 		tagsList = strings.Split(tagsParam, ",")
 	}
+	macIDParam := c.QueryParam("macID")
 
 	var processIDList []string
 	if processIDs != "" {
@@ -629,7 +634,7 @@ func (rh *RESTHandler) ListJobsHandler(c echo.Context) error {
 		offset = 0
 	}
 
-	result, err := rh.DB.GetJobs(limit, offset, processIDList, statusList, submittersList, tagsList)
+	result, err := rh.DB.GetJobs(limit, offset, processIDList, statusList, submittersList, tagsList, macIDParam)
 	if err != nil {
 		output := errResponse{HTTPStatus: http.StatusInternalServerError, Message: err.Error()}
 		return prepareResponse(c, http.StatusNotFound, "error", output)
