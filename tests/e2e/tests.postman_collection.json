@@ -2717,7 +2717,7 @@
                       "const jobsData = pm.response.json().jobs;",
                       "",
                       "pm.test(\"number of jobs in record test\", function () {",
-                      "    pm.expect(jobsData.length).to.eql(11);",
+                      "    pm.expect(jobsData.length).to.eql(14);",
                       "    });"
                     ],
                     "type": "text/javascript",
