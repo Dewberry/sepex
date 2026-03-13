@@ -39,6 +39,8 @@ type jobResponse struct {
 	ProcessID  string      `json:"processID,omitempty"`
 	Message    string      `json:"message,omitempty"`
 	Outputs    interface{} `json:"outputs,omitempty"`
+	Tags       []string    `json:"tags"`
+	MacID      string      `json:"macID,omitempty"`
 }
 
 type link struct {
@@ -416,20 +418,28 @@ func (rh *RESTHandler) JobStatusHandler(c echo.Context) (err error) {
 
 	var jRcrd jobs.JobRecord
 	jobID := c.Param("jobID")
+
 	if job, ok := rh.ActiveJobs.Jobs[jobID]; ok {
 		resp := jobResponse{
 			ProcessID:  (*job).ProcessID(),
 			JobID:      (*job).JobID(),
 			LastUpdate: (*job).LastUpdate(),
 			Status:     (*job).CurrentStatus(),
+			Tags:       []string{},
 		}
 		return prepareResponse(c, http.StatusOK, "jobStatus", resp)
 	} else if jRcrd, ok, err = rh.DB.GetJob(jobID); ok {
+		if jRcrd.Tags == nil {
+			jRcrd.Tags = []string{}
+		}
+
 		resp := jobResponse{
 			ProcessID:  jRcrd.ProcessID,
 			JobID:      jRcrd.JobID,
 			LastUpdate: jRcrd.LastUpdate,
 			Status:     jRcrd.Status,
+			Tags:       jRcrd.Tags,
+			MacID:      jRcrd.MacID,
 		}
 		return prepareResponse(c, http.StatusOK, "jobStatus", resp)
 	}
