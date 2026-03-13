@@ -1,1082 +1,1144 @@
 {
-	"info": {
-		"_postman_id": "c4d26f8c-50f5-4f4c-86c9-2aef531bc9a8",
-		"name": "sepex",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "36773789"
-	},
-	"item": [
-		{
-			"name": "sync",
-			"item": [
-				{
-					"name": "execution-cleanFloodPlain",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									""
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"inputs\": {\n        \"inputFile\": \"/vsis3/texas-glo/clipped-raster-inputs/input_raster.tif\",\n        \"outputFile\": \"/vsis3/texas-glo/v2r-clean-outputs/out.tif\"\n    }\n}\n\n",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{url}}/processes/:processID/execution",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"processes",
-								":processID",
-								"execution"
-							],
-							"variable": [
-								{
-									"key": "processID",
-									"value": "cleanFloodPlain"
-								}
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "pyecho",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									""
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\r\n    \"inputs\": {\r\n        \"text\": \"hello 🌎\"\r\n    }\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{url}}/processes/pyecho/execution",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"processes",
-								"pyecho",
-								"execution"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "subprocessEcho",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									""
-								],
-								"type": "text/javascript",
-								"packages": {}
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\r\n    \"inputs\": {}\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{url}}/processes/subprocessEcho/execution",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"processes",
-								"subprocessEcho",
-								"execution"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "pywrite",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									""
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\r\n    \"inputs\": {\r\n        \"userInput\": \"hello 🌎\",\r\n        \"outputFile\": \"hello.txt\"\r\n    }\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{url}}/processes/pywrite/execution",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"processes",
-								"pywrite",
-								"execution"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "execution-dfc",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									""
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"inputs\": {\n        \"crs\": \"4326\",\n        \"points\": [\n            [\n                -76.491824,\n                37.271065\n            ],\n            [\n                -76.508683,\n                37.264547\n            ],\n            [\n                -76.4920965,\n                37.2735359\n            ]\n        ],\n        \"tile\": \"122\",\n        \"epoch\": \"2020\"\n    }\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{url}}/processes/:processID/execution",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"processes",
-								":processID",
-								"execution"
-							],
-							"variable": [
-								{
-									"key": "processID",
-									"value": "dfc"
-								}
-							]
-						}
-					},
-					"response": []
-				}
-			],
-			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"type": "text/javascript",
-						"exec": [
-							""
-						]
-					}
-				},
-				{
-					"listen": "test",
-					"script": {
-						"type": "text/javascript",
-						"exec": [
-							"var resp = pm.response.json()",
-							"pm.collectionVariables.set(\"jobID\", resp[\"jobID\"])"
-						]
-					}
-				}
-			]
-		},
-		{
-			"name": "async",
-			"item": [
-				{
-					"name": "dfc",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"var resp = pm.response.json()\r",
-									"pm.collectionVariables.set(\"jobID\", resp[\"jobID\"])"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"inputs\": {\n        \"crs\": \"4326\",\n        \"points\": [\n            [\n                -76.491824,\n                37.271065\n            ]\n        ],\n        \"tile\": \"122\",\n        \"epoch\": \"2020\"\n    }\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{url}}/processes/:processID/execution",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"processes",
-								":processID",
-								"execution"
-							],
-							"variable": [
-								{
-									"key": "processID",
-									"value": "dfc"
-								}
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "loggingTest",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									"var resp = pm.response.json()\r",
-									"pm.collectionVariables.set(\"jobID\", resp[\"jobID\"])"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"inputs\": {}\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{url}}/processes/:processID/execution",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"processes",
-								":processID",
-								"execution"
-							],
-							"variable": [
-								{
-									"key": "processID",
-									"value": "loggingTest"
-								}
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "execution-aepGrid",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									""
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"inputs\": {\n        \"aepGridDestination\": \"aep-grid-outputs/output3.tif\",\n        \"tile\": \"106\",\n        \"epoch\": \"2020\"\n    }\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{url}}/processes/:processID/execution",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"processes",
-								":processID",
-								"execution"
-							],
-							"variable": [
-								{
-									"key": "processID",
-									"value": "aepGrid"
-								}
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "execution-ogrVersion",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									""
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"inputs\": {}\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{url}}/processes/:processID/execution",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"processes",
-								":processID",
-								"execution"
-							],
-							"variable": [
-								{
-									"key": "processID",
-									"value": "ogrVersion"
-								}
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "aorc-temp-ncdf2zarr-fargate",
-					"request": {
-						"auth": {
-							"type": "bearer",
-							"bearer": [
-								{
-									"key": "token",
-									"value": "{{bearer_token}}",
-									"type": "string"
-								}
-							]
-						},
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\r\n    \"inputs\": {\r\n        \"year\": 1979,\r\n        \"month\": 6\r\n    }\r\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{url}}/processes/:processID/execution",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"processes",
-								":processID",
-								"execution"
-							],
-							"variable": [
-								{
-									"key": "processID",
-									"value": "aorc-temp-ncdf2zarr-fargate"
-								}
-							]
-						}
-					},
-					"response": []
-				}
-			],
-			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"type": "text/javascript",
-						"exec": [
-							""
-						]
-					}
-				},
-				{
-					"listen": "test",
-					"script": {
-						"type": "text/javascript",
-						"exec": [
-							"var resp = pm.response.json()",
-							"pm.collectionVariables.set(\"jobID\", resp[\"jobID\"])"
-						]
-					}
-				}
-			]
-		},
-		{
-			"name": "callbacks",
-			"item": [
-				{
-					"name": "status_update",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									""
-								],
-								"type": "text/javascript"
-							}
-						},
-						{
-							"listen": "prerequest",
-							"script": {
-								"exec": [
-									"postman.setGlobalVariable('timestampUtc', (new Date()).toISOString());"
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "PUT",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"status\": \"successful\",\n    \"updated\": \"{{timestampUtc}}\"\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{url}}/jobs/:jobID/status",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"jobs",
-								":jobID",
-								"status"
-							],
-							"variable": [
-								{
-									"key": "jobID",
-									"value": "{{jobID}}"
-								}
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "results_update",
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"exec": [
-									""
-								],
-								"type": "text/javascript"
-							}
-						}
-					],
-					"request": {
-						"method": "POST",
-						"header": [],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"outputs\": [1,2,3]\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "{{url}}/jobs/:jobID/results_update",
-							"host": [
-								"{{url}}"
-							],
-							"path": [
-								"jobs",
-								":jobID",
-								"results_update"
-							],
-							"variable": [
-								{
-									"key": "jobID",
-									"value": "{{jobID}}"
-								}
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "admin",
-			"item": []
-		},
-		{
-			"name": "conformance",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{url}}/conformance",
-					"host": [
-						"{{url}}"
-					],
-					"path": [
-						"conformance"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "landingpage",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{url}}/",
-					"host": [
-						"{{url}}"
-					],
-					"path": [
-						""
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "processes",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{url}}/processes",
-					"host": [
-						"{{url}}"
-					],
-					"path": [
-						"processes"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "process-describe",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{url}}/processes/:processID",
-					"host": [
-						"{{url}}"
-					],
-					"path": [
-						"processes",
-						":processID"
-					],
-					"variable": [
-						{
-							"key": "processID",
-							"value": "dfc"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "add-process",
-			"request": {
-				"method": "POST",
-				"header": [],
-				"body": {
-					"mode": "raw",
-					"raw": "{\r\n    \"info\": {\r\n        \"version\": \"1.0.0\",\r\n        \"id\": \"dfc\",\r\n        \"title\": \"Depth Frequency Curve\",\r\n        \"description\": \"Returns data for depth-frequency curve\",\r\n        \"jobControlOptions\": [\"async-execute\"],\r\n        \"outputTransmission\": [\"value\"]\r\n    },\r\n    \"host\": {\r\n        \"type\": \"aws-batch\",\r\n        \"jobDefinition\": \"process-sandbox:2\",\r\n        \"jobQueue\": \"micro-test\"\r\n    },\r\n    \"command\": [\"python\", \"dfc.py\"],\r\n    \"inputs\": [\r\n        {\r\n            \"id\": \"crs\",\r\n            \"title\": \"crs\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 0,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"tile\",\r\n            \"title\": \"tile\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"epoch\",\r\n            \"title\": \"epoch\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"points\",\r\n            \"title\": \"points\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 999999\r\n        }\r\n    ],\r\n    \"outputs\": [\r\n        {\r\n            \"id\": \"dfc\",\r\n            \"title\": \"dfc\",\r\n            \"description\": \"\",\r\n            \"output\": {\r\n                \"transmissionMode\": [\r\n                    \"value\"\r\n                ]\r\n            }\r\n        }\r\n    ]\r\n}",
-					"options": {
-						"raw": {
-							"language": "json"
-						}
-					}
-				},
-				"url": {
-					"raw": "{{url}}/processes/:processID",
-					"host": [
-						"{{url}}"
-					],
-					"path": [
-						"processes",
-						":processID"
-					],
-					"variable": [
-						{
-							"key": "processID",
-							"value": "dfc"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "update-process",
-			"request": {
-				"method": "PUT",
-				"header": [],
-				"body": {
-					"mode": "raw",
-					"raw": "{\r\n    \"info\": {\r\n        \"version\": \"1.0.0\",\r\n        \"id\": \"dfc\",\r\n        \"title\": \"Updated Depth Frequency Curve\",\r\n        \"description\": \"Returns data for depth-frequency curve\",\r\n        \"jobControlOptions\": [\"async-execute\"],\r\n        \"outputTransmission\": [\"value\"]\r\n    },\r\n    \"host\": {\r\n        \"type\": \"aws-batch\",\r\n        \"jobDefinition\": \"process-sandbox:2\",\r\n        \"jobQueue\": \"micro-test\"\r\n    },\r\n    \"command\": [\"python\", \"dfc.py\"],\r\n    \"inputs\": [\r\n        {\r\n            \"id\": \"crs\",\r\n            \"title\": \"crs\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 0,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"tile\",\r\n            \"title\": \"tile\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"epoch\",\r\n            \"title\": \"epoch\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"points\",\r\n            \"title\": \"points\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 999999\r\n        }\r\n    ],\r\n    \"outputs\": [\r\n        {\r\n            \"id\": \"dfc\",\r\n            \"title\": \"dfc\",\r\n            \"description\": \"\",\r\n            \"output\": {\r\n                \"transmissionMode\": [\r\n                    \"value\"\r\n                ]\r\n            }\r\n        }\r\n    ]\r\n}",
-					"options": {
-						"raw": {
-							"language": "json"
-						}
-					}
-				},
-				"url": {
-					"raw": "{{url}}/processes/:processID",
-					"host": [
-						"{{url}}"
-					],
-					"path": [
-						"processes",
-						":processID"
-					],
-					"variable": [
-						{
-							"key": "processID",
-							"value": "dfc"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "delete-process",
-			"request": {
-				"method": "DELETE",
-				"header": [],
-				"url": {
-					"raw": "{{url}}/processes/:processID",
-					"host": [
-						"{{url}}"
-					],
-					"path": [
-						"processes",
-						":processID"
-					],
-					"variable": [
-						{
-							"key": "processID",
-							"value": "dfc"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "jobs",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{url}}/jobs",
-					"host": [
-						"{{url}}"
-					],
-					"path": [
-						"jobs"
-					],
-					"query": [
-						{
-							"key": "submitter",
-							"value": "",
-							"disabled": true
-						},
-						{
-							"key": "limit",
-							"value": null,
-							"disabled": true
-						},
-						{
-							"key": "offset",
-							"value": null,
-							"disabled": true
-						},
-						{
-							"key": "processid",
-							"value": null,
-							"disabled": true
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "job-status",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{url}}/jobs/:jobID",
-					"host": [
-						"{{url}}"
-					],
-					"path": [
-						"jobs",
-						":jobID"
-					],
-					"variable": [
-						{
-							"key": "jobID",
-							"value": "{{jobID}}"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "job-results",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{url}}/jobs/:jobID/results",
-					"host": [
-						"{{url}}"
-					],
-					"path": [
-						"jobs",
-						":jobID",
-						"results"
-					],
-					"variable": [
-						{
-							"key": "jobID",
-							"value": "{{jobID}}"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "job-logs",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{url}}/jobs/:jobID/logs",
-					"host": [
-						"{{url}}"
-					],
-					"path": [
-						"jobs",
-						":jobID",
-						"logs"
-					],
-					"variable": [
-						{
-							"key": "jobID",
-							"value": "{{jobID}}"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "job-metadata",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{url}}/jobs/:jobID/metadata",
-					"host": [
-						"{{url}}"
-					],
-					"path": [
-						"jobs",
-						":jobID",
-						"metadata"
-					],
-					"variable": [
-						{
-							"key": "jobID",
-							"value": "{{jobID}}"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "job-dismiss",
-			"request": {
-				"method": "DELETE",
-				"header": [],
-				"url": {
-					"raw": "{{url}}/jobs/:jobID",
-					"host": [
-						"{{url}}"
-					],
-					"path": [
-						"jobs",
-						":jobID"
-					],
-					"variable": [
-						{
-							"key": "jobID",
-							"value": "{{jobID}}"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "login",
-			"event": [
-				{
-					"listen": "test",
-					"script": {
-						"exec": [
-							"var jsonData = JSON.parse(responseBody);\r",
-							"postman.setEnvironmentVariable(\"bearer_token\", jsonData.access_token);"
-						],
-						"type": "text/javascript"
-					}
-				}
-			],
-			"request": {
-				"method": "POST",
-				"header": [],
-				"body": {
-					"mode": "urlencoded",
-					"urlencoded": [
-						{
-							"key": "username",
-							"value": "{{auth_username}}",
-							"type": "text"
-						},
-						{
-							"key": "password",
-							"value": "{{auth_password}}",
-							"type": "text"
-						},
-						{
-							"key": "client_id",
-							"value": "{{auth_client_id}}",
-							"type": "text"
-						},
-						{
-							"key": "grant_type",
-							"value": "password",
-							"type": "text"
-						},
-						{
-							"key": "client_secret",
-							"value": "{{auth_client_secret}}",
-							"type": "text"
-						}
-					]
-				},
-				"url": {
-					"raw": "{{auth_url}}/protocol/openid-connect/token",
-					"host": [
-						"{{auth_url}}"
-					],
-					"path": [
-						"protocol",
-						"openid-connect",
-						"token"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "service-account-login",
-			"event": [
-				{
-					"listen": "test",
-					"script": {
-						"exec": [
-							"var jsonData = JSON.parse(responseBody);\r",
-							"postman.setEnvironmentVariable(\"bearer_token\", jsonData.access_token);"
-						],
-						"type": "text/javascript"
-					}
-				}
-			],
-			"request": {
-				"method": "POST",
-				"header": [],
-				"body": {
-					"mode": "urlencoded",
-					"urlencoded": [
-						{
-							"key": "client_id",
-							"value": "{{auth_client_id}}",
-							"type": "text"
-						},
-						{
-							"key": "grant_type",
-							"value": "client_credentials",
-							"type": "text"
-						},
-						{
-							"key": "client_secret",
-							"value": "{{auth_client_secret}}",
-							"type": "text"
-						}
-					]
-				},
-				"url": {
-					"raw": "{{auth_url}}/protocol/openid-connect/token",
-					"host": [
-						"{{auth_url}}"
-					],
-					"path": [
-						"protocol",
-						"openid-connect",
-						"token"
-					]
-				}
-			},
-			"response": []
-		}
-	],
-	"auth": {
-		"type": "bearer",
-		"bearer": [
-			{
-				"key": "token",
-				"value": "{{bearer_token}}",
-				"type": "string"
-			}
-		]
-	},
-	"event": [
-		{
-			"listen": "prerequest",
-			"script": {
-				"type": "text/javascript",
-				"exec": [
-					"pm.request.headers.add({",
-					"    key: 'X-SEPEX-User-Email',",
-					"    value: pm.variables.get('auth_username')",
-					"});"
-				]
-			}
-		},
-		{
-			"listen": "test",
-			"script": {
-				"type": "text/javascript",
-				"exec": [
-					""
-				]
-			}
-		}
-	],
-	"variable": [
-		{
-			"key": "jobID",
-			"value": ""
-		}
-	]
+  "info": {
+    "_postman_id": "c4d26f8c-50f5-4f4c-86c9-2aef531bc9a8",
+    "name": "sepex",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "36773789"
+  },
+  "item": [
+    {
+      "name": "sync",
+      "item": [
+        {
+          "name": "execution-cleanFloodPlain",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"inputs\": {\n        \"inputFile\": \"/vsis3/texas-glo/clipped-raster-inputs/input_raster.tif\",\n        \"outputFile\": \"/vsis3/texas-glo/v2r-clean-outputs/out.tif\"\n    }\n}\n\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/processes/:processID/execution",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "processes",
+                ":processID",
+                "execution"
+              ],
+              "variable": [
+                {
+                  "key": "processID",
+                  "value": "cleanFloodPlain"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "pyecho",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"inputs\": {\r\n        \"text\": \"hello 🌎\"\r\n    }\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/processes/pyecho/execution",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "processes",
+                "pyecho",
+                "execution"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "pyecho-with-tags",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"inputs\": {\n        \"text\": \"hello 🌎\"\n    },\n    \"tags\": [\"texas\", \"huc984727\"]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/processes/pyecho/execution",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "processes",
+                "pyecho",
+                "execution"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "subprocessEcho",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"inputs\": {}\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/processes/subprocessEcho/execution",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "processes",
+                "subprocessEcho",
+                "execution"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "pywrite",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"inputs\": {\r\n        \"userInput\": \"hello 🌎\",\r\n        \"outputFile\": \"hello.txt\"\r\n    }\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/processes/pywrite/execution",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "processes",
+                "pywrite",
+                "execution"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "execution-dfc",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"inputs\": {\n        \"crs\": \"4326\",\n        \"points\": [\n            [\n                -76.491824,\n                37.271065\n            ],\n            [\n                -76.508683,\n                37.264547\n            ],\n            [\n                -76.4920965,\n                37.2735359\n            ]\n        ],\n        \"tile\": \"122\",\n        \"epoch\": \"2020\"\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/processes/:processID/execution",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "processes",
+                ":processID",
+                "execution"
+              ],
+              "variable": [
+                {
+                  "key": "processID",
+                  "value": "dfc"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              ""
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json()",
+              "pm.collectionVariables.set(\"jobID\", resp[\"jobID\"])"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "async",
+      "item": [
+        {
+          "name": "dfc",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var resp = pm.response.json()\r",
+                  "pm.collectionVariables.set(\"jobID\", resp[\"jobID\"])"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"inputs\": {\n        \"crs\": \"4326\",\n        \"points\": [\n            [\n                -76.491824,\n                37.271065\n            ]\n        ],\n        \"tile\": \"122\",\n        \"epoch\": \"2020\"\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/processes/:processID/execution",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "processes",
+                ":processID",
+                "execution"
+              ],
+              "variable": [
+                {
+                  "key": "processID",
+                  "value": "dfc"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "loggingTest",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var resp = pm.response.json()\r",
+                  "pm.collectionVariables.set(\"jobID\", resp[\"jobID\"])"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"inputs\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/processes/:processID/execution",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "processes",
+                ":processID",
+                "execution"
+              ],
+              "variable": [
+                {
+                  "key": "processID",
+                  "value": "loggingTest"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "execution-aepGrid",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"inputs\": {\n        \"aepGridDestination\": \"aep-grid-outputs/output3.tif\",\n        \"tile\": \"106\",\n        \"epoch\": \"2020\"\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/processes/:processID/execution",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "processes",
+                ":processID",
+                "execution"
+              ],
+              "variable": [
+                {
+                  "key": "processID",
+                  "value": "aepGrid"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "execution-ogrVersion",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"inputs\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/processes/:processID/execution",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "processes",
+                ":processID",
+                "execution"
+              ],
+              "variable": [
+                {
+                  "key": "processID",
+                  "value": "ogrVersion"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "aorc-temp-ncdf2zarr-fargate",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{bearer_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"inputs\": {\r\n        \"year\": 1979,\r\n        \"month\": 6\r\n    }\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/processes/:processID/execution",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "processes",
+                ":processID",
+                "execution"
+              ],
+              "variable": [
+                {
+                  "key": "processID",
+                  "value": "aorc-temp-ncdf2zarr-fargate"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              ""
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "var resp = pm.response.json()",
+              "pm.collectionVariables.set(\"jobID\", resp[\"jobID\"])"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "callbacks",
+      "item": [
+        {
+          "name": "status_update",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "postman.setGlobalVariable('timestampUtc', (new Date()).toISOString());"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"status\": \"successful\",\n    \"updated\": \"{{timestampUtc}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/jobs/:jobID/status",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "jobs",
+                ":jobID",
+                "status"
+              ],
+              "variable": [
+                {
+                  "key": "jobID",
+                  "value": "{{jobID}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "results_update",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  ""
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"outputs\": [1,2,3]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/jobs/:jobID/results_update",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "jobs",
+                ":jobID",
+                "results_update"
+              ],
+              "variable": [
+                {
+                  "key": "jobID",
+                  "value": "{{jobID}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "admin",
+      "item": []
+    },
+    {
+      "name": "conformance",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{url}}/conformance",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "conformance"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "landingpage",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{url}}/",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            ""
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "processes",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{url}}/processes",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "processes"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "process-describe",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{url}}/processes/:processID",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "processes",
+            ":processID"
+          ],
+          "variable": [
+            {
+              "key": "processID",
+              "value": "dfc"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "add-process",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"info\": {\r\n        \"version\": \"1.0.0\",\r\n        \"id\": \"dfc\",\r\n        \"title\": \"Depth Frequency Curve\",\r\n        \"description\": \"Returns data for depth-frequency curve\",\r\n        \"jobControlOptions\": [\"async-execute\"],\r\n        \"outputTransmission\": [\"value\"]\r\n    },\r\n    \"host\": {\r\n        \"type\": \"aws-batch\",\r\n        \"jobDefinition\": \"process-sandbox:2\",\r\n        \"jobQueue\": \"micro-test\"\r\n    },\r\n    \"command\": [\"python\", \"dfc.py\"],\r\n    \"inputs\": [\r\n        {\r\n            \"id\": \"crs\",\r\n            \"title\": \"crs\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 0,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"tile\",\r\n            \"title\": \"tile\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"epoch\",\r\n            \"title\": \"epoch\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"points\",\r\n            \"title\": \"points\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 999999\r\n        }\r\n    ],\r\n    \"outputs\": [\r\n        {\r\n            \"id\": \"dfc\",\r\n            \"title\": \"dfc\",\r\n            \"description\": \"\",\r\n            \"output\": {\r\n                \"transmissionMode\": [\r\n                    \"value\"\r\n                ]\r\n            }\r\n        }\r\n    ]\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{url}}/processes/:processID",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "processes",
+            ":processID"
+          ],
+          "variable": [
+            {
+              "key": "processID",
+              "value": "dfc"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "update-process",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"info\": {\r\n        \"version\": \"1.0.0\",\r\n        \"id\": \"dfc\",\r\n        \"title\": \"Updated Depth Frequency Curve\",\r\n        \"description\": \"Returns data for depth-frequency curve\",\r\n        \"jobControlOptions\": [\"async-execute\"],\r\n        \"outputTransmission\": [\"value\"]\r\n    },\r\n    \"host\": {\r\n        \"type\": \"aws-batch\",\r\n        \"jobDefinition\": \"process-sandbox:2\",\r\n        \"jobQueue\": \"micro-test\"\r\n    },\r\n    \"command\": [\"python\", \"dfc.py\"],\r\n    \"inputs\": [\r\n        {\r\n            \"id\": \"crs\",\r\n            \"title\": \"crs\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 0,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"tile\",\r\n            \"title\": \"tile\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"epoch\",\r\n            \"title\": \"epoch\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 1\r\n        },\r\n        {\r\n            \"id\": \"points\",\r\n            \"title\": \"points\",\r\n            \"description\": \"\",\r\n            \"input\": {\r\n                \"literalDataDomain\": {\r\n                    \"dataType\": \"value\",\r\n                    \"valueDefinition\": {\r\n                        \"anyValue\": true,\r\n                        \"possibleValues\": null\r\n                    }\r\n                }\r\n            },\r\n            \"minOccurs\": 1,\r\n            \"maxOccurs\": 999999\r\n        }\r\n    ],\r\n    \"outputs\": [\r\n        {\r\n            \"id\": \"dfc\",\r\n            \"title\": \"dfc\",\r\n            \"description\": \"\",\r\n            \"output\": {\r\n                \"transmissionMode\": [\r\n                    \"value\"\r\n                ]\r\n            }\r\n        }\r\n    ]\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{url}}/processes/:processID",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "processes",
+            ":processID"
+          ],
+          "variable": [
+            {
+              "key": "processID",
+              "value": "dfc"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "delete-process",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{url}}/processes/:processID",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "processes",
+            ":processID"
+          ],
+          "variable": [
+            {
+              "key": "processID",
+              "value": "dfc"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "jobs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{url}}/jobs",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "jobs"
+          ],
+          "query": [
+            {
+              "key": "submitter",
+              "value": "",
+              "disabled": true
+            },
+            {
+              "key": "limit",
+              "value": null,
+              "disabled": true
+            },
+            {
+              "key": "offset",
+              "value": null,
+              "disabled": true
+            },
+            {
+              "key": "processid",
+              "value": null,
+              "disabled": true
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "jobs-filter-by-tags",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{url}}/jobs?tags=texas,huc984727",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "jobs"
+          ],
+          "query": [
+            {
+              "key": "tags",
+              "value": "texas,huc984727"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "job-status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{url}}/jobs/:jobID",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "jobs",
+            ":jobID"
+          ],
+          "variable": [
+            {
+              "key": "jobID",
+              "value": "{{jobID}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "job-results",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{url}}/jobs/:jobID/results",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "jobs",
+            ":jobID",
+            "results"
+          ],
+          "variable": [
+            {
+              "key": "jobID",
+              "value": "{{jobID}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "job-logs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{url}}/jobs/:jobID/logs",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "jobs",
+            ":jobID",
+            "logs"
+          ],
+          "variable": [
+            {
+              "key": "jobID",
+              "value": "{{jobID}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "job-metadata",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{url}}/jobs/:jobID/metadata",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "jobs",
+            ":jobID",
+            "metadata"
+          ],
+          "variable": [
+            {
+              "key": "jobID",
+              "value": "{{jobID}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "job-dismiss",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{url}}/jobs/:jobID",
+          "host": [
+            "{{url}}"
+          ],
+          "path": [
+            "jobs",
+            ":jobID"
+          ],
+          "variable": [
+            {
+              "key": "jobID",
+              "value": "{{jobID}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = JSON.parse(responseBody);\r",
+              "postman.setEnvironmentVariable(\"bearer_token\", jsonData.access_token);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "username",
+              "value": "{{auth_username}}",
+              "type": "text"
+            },
+            {
+              "key": "password",
+              "value": "{{auth_password}}",
+              "type": "text"
+            },
+            {
+              "key": "client_id",
+              "value": "{{auth_client_id}}",
+              "type": "text"
+            },
+            {
+              "key": "grant_type",
+              "value": "password",
+              "type": "text"
+            },
+            {
+              "key": "client_secret",
+              "value": "{{auth_client_secret}}",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{auth_url}}/protocol/openid-connect/token",
+          "host": [
+            "{{auth_url}}"
+          ],
+          "path": [
+            "protocol",
+            "openid-connect",
+            "token"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "service-account-login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = JSON.parse(responseBody);\r",
+              "postman.setEnvironmentVariable(\"bearer_token\", jsonData.access_token);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "client_id",
+              "value": "{{auth_client_id}}",
+              "type": "text"
+            },
+            {
+              "key": "grant_type",
+              "value": "client_credentials",
+              "type": "text"
+            },
+            {
+              "key": "client_secret",
+              "value": "{{auth_client_secret}}",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{auth_url}}/protocol/openid-connect/token",
+          "host": [
+            "{{auth_url}}"
+          ],
+          "path": [
+            "protocol",
+            "openid-connect",
+            "token"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{bearer_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.request.headers.add({",
+          "    key: 'X-SEPEX-User-Email',",
+          "    value: pm.variables.get('auth_username')",
+          "});"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "jobID",
+      "value": ""
+    }
+  ]
 }
