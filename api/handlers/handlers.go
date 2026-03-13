@@ -97,8 +97,8 @@ func prepareResponse(c echo.Context, httpStatus int, renderName string, output i
 // specs: https://developer.ogc.org/api/processes/index.html#tag/Execute
 type runRequestBody struct {
 	Inputs map[string]interface{} `json:"inputs"`
-	Tags   []string               `json:"tags,omitempty"`
-	MacID  string                 `json:"macID,omitempty"`
+	Tags   []string               `json:"tags"`
+	MacID  string                 `json:"macID"`
 }
 
 // LandingPage godoc
