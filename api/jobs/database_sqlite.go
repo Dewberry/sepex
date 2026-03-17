@@ -80,8 +80,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 		host_job_id TEXT NOT NULL DEFAULT '',
     process_id TEXT NOT NULL,
     submitter TEXT NOT NULL DEFAULT '',
-    tags TEXT NOT NULL DEFAULT '',
-		macID TEXT NOT NULL DEFAULT ''
+    tags TEXT NOT NULL DEFAULT ''
 );
 
 	CREATE INDEX IF NOT EXISTS idx_jobs_updated ON jobs(updated);
@@ -97,9 +96,9 @@ CREATE TABLE IF NOT EXISTS jobs (
 }
 
 // Add job to the database. Will return error if job exist.
-func (sqliteDB *SQLiteDB) addJob(jid, status, mode, host, hostJobID, processID, submitter string, tags []string, macID string, updated time.Time) error {
-	query := `INSERT INTO jobs (id, status, updated, mode, host, host_job_id, process_id, submitter, tags, macID) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := sqliteDB.Handle.Exec(query, jid, status, updated, mode, host, hostJobID, processID, submitter, joinTags(tags), macID)
+func (sqliteDB *SQLiteDB) addJob(jid, status, mode, host, hostJobID, processID, submitter string, tags []string, updated time.Time) error {
+	query := `INSERT INTO jobs (id, status, updated, mode, host, host_job_id, process_id, submitter, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	_, err := sqliteDB.Handle.Exec(query, jid, status, updated, mode, host, hostJobID, processID, submitter, joinTags(tags))
 	return err
 }
 
@@ -124,11 +123,11 @@ func (sqliteDB *SQLiteDB) updateJobRecord(jid, status string, now time.Time) err
 // If job do not exists, or error encountered bool would be false.
 // Similar behavior as key exist in hashmap.
 func (sqliteDB *SQLiteDB) GetJob(jid string) (JobRecord, bool, error) {
-	query := `SELECT id, status, updated, mode, host, host_job_id, process_id, submitter, tags, macID FROM jobs WHERE id = ?`
+	query := `SELECT id, status, updated, mode, host, host_job_id, process_id, submitter, tags FROM jobs WHERE id = ?`
 	jr := JobRecord{}
 	var tagsStr string
 	row := sqliteDB.Handle.QueryRow(query, jid)
-	err := row.Scan(&jr.JobID, &jr.Status, &jr.LastUpdate, &jr.Mode, &jr.Host, &jr.HostJobID, &jr.ProcessID, &jr.Submitter, &tagsStr, &jr.MacID)
+	err := row.Scan(&jr.JobID, &jr.Status, &jr.LastUpdate, &jr.Mode, &jr.Host, &jr.HostJobID, &jr.ProcessID, &jr.Submitter, &tagsStr)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return JobRecord{}, false, nil
@@ -159,8 +158,8 @@ func (sqliteDB *SQLiteDB) CheckJobExist(jid string) (bool, error) {
 }
 
 // Assumes query parameters are valid
-func (sqliteDB *SQLiteDB) GetJobs(limit, offset int, processIDs, statuses, submitters, tags []string, macID string) ([]JobRecord, error) {
-	baseQuery := `SELECT id, status, updated, process_id, submitter, tags, macID FROM jobs`
+func (sqliteDB *SQLiteDB) GetJobs(limit, offset int, processIDs, statuses, submitters, tags []string) ([]JobRecord, error) {
+	baseQuery := `SELECT id, status, updated, process_id, submitter, tags FROM jobs`
 	whereClauses := []string{}
 	args := []interface{}{}
 
@@ -209,7 +208,7 @@ func (sqliteDB *SQLiteDB) GetJobs(limit, offset int, processIDs, statuses, submi
 	for rows.Next() {
 		var r JobRecord
 		var tagsStr string
-		if err := rows.Scan(&r.JobID, &r.Status, &r.LastUpdate, &r.ProcessID, &r.Submitter, &tagsStr, &r.MacID); err != nil {
+		if err := rows.Scan(&r.JobID, &r.Status, &r.LastUpdate, &r.ProcessID, &r.Submitter, &tagsStr); err != nil {
 			return nil, err
 		}
 		r.Tags = splitTags(tagsStr)

@@ -35,7 +35,6 @@ type SubprocessJob struct {
 	UpdateTime     time.Time
 	Status         string   `json:"status"`
 	Tags           []string `json:"tags"`
-	MacID          string   `json:"macID"`
 	execCmd        *exec.Cmd
 
 	logger  *log.Logger
@@ -189,7 +188,7 @@ func (j *SubprocessJob) Create() error {
 	j.ctxCancel = cancelFunc
 
 	// At this point job is ready to be added to database
-	err = j.DB.addJob(j.UUID, "accepted", "", "subprocess", "", j.ProcessName, j.Submitter, j.Tags, j.MacID, time.Now())
+	err = j.DB.addJob(j.UUID, "accepted", "", "subprocess", "", j.ProcessName, j.Submitter, j.Tags, time.Now())
 
 	if err != nil {
 		j.ctxCancel()

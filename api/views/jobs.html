@@ -20,7 +20,6 @@
         <th>Status</th>
         <th>ProcessID</th>
         <th>Tags</th>
-        <th>MacID</th>
         <th>Submitter</th>
         <th>Updated</th>
       </tr>
@@ -47,7 +46,6 @@
         </td>
         <td><a href="/processes/{{.ProcessID}}" target="_blank">{{.ProcessID}}</a></td>
         <td>{{range .Tags}}<span class="tag">{{.}}</span> {{end}}</td>
-        <td>{{.MacID}}</td>
         <td>{{.Submitter}}</td>
         <td>{{.LastUpdate.Format "2006-01-02 15:04:05 MST"}}</td>
       </tr>

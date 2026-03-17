@@ -40,7 +40,6 @@ type jobResponse struct {
 	Message    string      `json:"message,omitempty"`
 	Outputs    interface{} `json:"outputs,omitempty"`
 	Tags       []string    `json:"tags"`
-	MacID      string      `json:"macID,omitempty"`
 }
 
 type link struct {
@@ -100,7 +99,6 @@ func prepareResponse(c echo.Context, httpStatus int, renderName string, output i
 type runRequestBody struct {
 	Inputs map[string]interface{} `json:"inputs"`
 	Tags   []string               `json:"tags"`
-	MacID  string                 `json:"macID"`
 }
 
 // LandingPage godoc
@@ -254,7 +252,6 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			DB:             rh.DB,
 			DoneChan:       rh.MessageQueue.JobDone,
 			Tags:           params.Tags,
-			MacID:          params.MacID,
 			ResourcePool:   rh.ResourcePool,
 			IsSync:         mode == "sync-execute",
 		}
@@ -275,7 +272,6 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			DB:             rh.DB,
 			DoneChan:       rh.MessageQueue.JobDone,
 			Tags:           params.Tags,
-			MacID:          params.MacID,
 		}
 
 	case "subprocess":
@@ -291,7 +287,6 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			DB:             rh.DB,
 			DoneChan:       rh.MessageQueue.JobDone,
 			Tags:           params.Tags,
-			MacID:          params.MacID,
 			ResourcePool:   rh.ResourcePool,
 			IsSync:         mode == "sync-execute",
 		}
@@ -439,7 +434,6 @@ func (rh *RESTHandler) JobStatusHandler(c echo.Context) (err error) {
 			LastUpdate: jRcrd.LastUpdate,
 			Status:     jRcrd.Status,
 			Tags:       jRcrd.Tags,
-			MacID:      jRcrd.MacID,
 		}
 		return prepareResponse(c, http.StatusOK, "jobStatus", resp)
 	}
@@ -643,7 +637,6 @@ func (rh *RESTHandler) ListJobsHandler(c echo.Context) error {
 	if tagsParam != "" {
 		tagsList = strings.Split(tagsParam, ",")
 	}
-	macIDParam := c.QueryParam("macID")
 
 	var processIDList []string
 	if processIDs != "" {
@@ -687,7 +680,7 @@ func (rh *RESTHandler) ListJobsHandler(c echo.Context) error {
 		offset = 0
 	}
 
-	result, err := rh.DB.GetJobs(limit, offset, processIDList, statusList, submittersList, tagsList, macIDParam)
+	result, err := rh.DB.GetJobs(limit, offset, processIDList, statusList, submittersList, tagsList)
 	if err != nil {
 		output := errResponse{HTTPStatus: http.StatusInternalServerError, Message: err.Error()}
 		return prepareResponse(c, http.StatusNotFound, "error", output)
