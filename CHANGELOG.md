@@ -16,12 +16,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 #### POST /processes/:processID/execution
 
 - Added optional `tags` array to execution payload. Tags are stored with the job record and can be used to filter jobs when querying `/jobs`.
-- Added optional `macID` string to execution payload to associate jobs with a specific client or machine.
 
 #### GET /jobs
 
-- Added `macID` query parameter to filter jobs by machine identifier.
-- Job responses now include `tags` and `macID` fields.
+- Job responses now includes the `tags` field.
 
 ## [0.2.2] - 2025-2-28
 

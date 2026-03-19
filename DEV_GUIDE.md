@@ -31,7 +31,6 @@
 
 - If `"inputs": {}` in `/execution` payload, nothing will be appended to process commands. This allows running processes that do not have any inputs.
 - `"tags"` (optional) can be included as an array of strings in the `/execution` payload. Tags are stored with the job record and can be used to filter jobs when querying `/jobs`. If omitted, the job will be created with an empty tag list.
-- `"macID"` (optional) can be included as a string in the `/execution` payload. This value is stored with the job record and can be used to associate jobs with a specific machine or client and filter jobs via the `/jobs` endpoint.
 
 Example payload:
 
@@ -41,7 +40,6 @@ Example payload:
     "text": "Hello World"
   },
   "tags": ["example", "test"],
-  "macID": "machine-01"
 }
 ```
 

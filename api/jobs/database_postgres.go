@@ -72,9 +72,6 @@ func (postgresDB *PostgresDB) createTables() error {
 	if _, err := postgresDB.Handle.Exec(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}';`); err != nil {
 		return fmt.Errorf("error adding tags column: %s", err)
 	}
-	if _, err := postgresDB.Handle.Exec(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS macID TEXT NOT NULL DEFAULT '';`); err != nil {
-		return fmt.Errorf("error adding macID column: %s", err)
-	}
 	return nil
 }
 
