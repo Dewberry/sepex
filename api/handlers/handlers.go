@@ -196,6 +196,11 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 		params.Tags = []string{} // default to empty if not provided
 	}
 
+	err = utils.ValidateTags(params.Tags)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, errResponse{Message: err.Error()})
+	}
+
 	err = p.VerifyInputs(params.Inputs)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, errResponse{Message: err.Error()})

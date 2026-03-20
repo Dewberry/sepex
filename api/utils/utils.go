@@ -4,8 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -133,4 +136,21 @@ func GetS3LinesData(key string, svc *s3.S3) ([]string, error) {
 	}
 
 	return lines, nil
+}
+
+var validTagPattern = regexp.MustCompile(`^[A-Za-z0-9._\-]+$`)
+
+func ValidateTags(tags []string) error {
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+
+		if tag == "" {
+			return fmt.Errorf("tags cannot contain empty values")
+		}
+
+		if !validTagPattern.MatchString(tag) {
+			return fmt.Errorf("tag %q contains unsupported characters. Allowed characters are letters, numbers, '.', '-', and '_'", tag)
+		}
+	}
+	return nil
 }
