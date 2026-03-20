@@ -3082,7 +3082,7 @@
               "response": []
             },
             {
-              "name": "fetch-with-tag-prefix-tes",
+              "name": "fetch-with-tag-prefix-tex",
               "event": [
                 {
                   "listen": "test",
@@ -3090,10 +3090,10 @@
                     "type": "text/javascript",
                     "exec": [
                       "const jobsData = pm.response.json().jobs;",
-                      "pm.test(\"Searching tags by prefix tes returns texas-tagged jobs\", function () {",
+                      "pm.test(\"Searching tags by prefix tex returns texas-tagged jobs\", function () {",
                       "    pm.expect(jobsData.length).to.be.above(0);",
                       "    jobsData.forEach(job => {",
-                      "        pm.expect(job.tags.some(tag => tag.includes(\"tes\"))).to.eql(true);",
+                      "        pm.expect(job.tags.some(tag => tag.includes(\"tex\"))).to.eql(true);",
                       "    });",
                       "});"
                     ]
@@ -3104,7 +3104,7 @@
                 "method": "GET",
                 "header": [],
                 "url": {
-                  "raw": "{{url}}/jobs?tags=tes",
+                  "raw": "{{url}}/jobs?tags=tex",
                   "host": [
                     "{{url}}"
                   ],
@@ -3114,7 +3114,7 @@
                   "query": [
                     {
                       "key": "tags",
-                      "value": "tes"
+                      "value": "tex"
                     }
                   ]
                 }
