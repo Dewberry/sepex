@@ -3080,6 +3080,86 @@
                 }
               },
               "response": []
+            },
+            {
+              "name": "fetch-with-tag-prefix-tes",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const jobsData = pm.response.json().jobs;",
+                      "pm.test(\"Searching tags by prefix tes returns texas-tagged jobs\", function () {",
+                      "    pm.expect(jobsData.length).to.be.above(0);",
+                      "    jobsData.forEach(job => {",
+                      "        pm.expect(job.tags.some(tag => tag.includes(\"tes\"))).to.eql(true);",
+                      "    });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{url}}/jobs?tags=tes",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "jobs"
+                  ],
+                  "query": [
+                    {
+                      "key": "tags",
+                      "value": "tes"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "fetch-with-tag-substring-xas",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const jobsData = pm.response.json().jobs;",
+                      "pm.test(\"Searching tags by substring xas returns texas-tagged jobs\", function () {",
+                      "    pm.expect(jobsData.length).to.be.above(0);",
+                      "    jobsData.forEach(job => {",
+                      "        pm.expect(job.tags.some(tag => tag.includes(\"xas\"))).to.eql(true);",
+                      "    });",
+                      "});"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{url}}/jobs?tags=xas",
+                  "host": [
+                    "{{url}}"
+                  ],
+                  "path": [
+                    "jobs"
+                  ],
+                  "query": [
+                    {
+                      "key": "tags",
+                      "value": "xas"
+                    }
+                  ]
+                }
+              },
+              "response": []
             }
           ],
           "event": [
