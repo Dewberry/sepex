@@ -3122,7 +3122,7 @@
               "response": []
             },
             {
-              "name": "fetch-with-tag-substring-xas",
+              "name": "fetch-with-tag-non-prefix-xas",
               "event": [
                 {
                   "listen": "test",
@@ -3130,11 +3130,8 @@
                     "type": "text/javascript",
                     "exec": [
                       "const jobsData = pm.response.json().jobs;",
-                      "pm.test(\"Searching tags by substring xas returns texas-tagged jobs\", function () {",
-                      "    pm.expect(jobsData.length).to.be.above(0);",
-                      "    jobsData.forEach(job => {",
-                      "        pm.expect(job.tags.some(tag => tag.includes(\"xas\"))).to.eql(true);",
-                      "    });",
+                      "pm.test(\"Searching tags by non-prefix 'xas' returns no jobs\", function () {",
+                      "    pm.expect(jobsData.length).to.eql(0);",
                       "});"
                     ]
                   }

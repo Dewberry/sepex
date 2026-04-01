@@ -196,7 +196,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 		params.Tags = []string{} // default to empty if not provided
 	}
 
-	err = utils.ValidateTags(params.Tags)
+	err = utils.SanitizeTags(params.Tags)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, errResponse{Message: err.Error()})
 	}
@@ -317,7 +317,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 		c.Response().Header().Set("Preference-Applied", modeResult.PreferenceApplied)
 	}
 
-	resp := jobResponse{ProcessID: j.ProcessID(), Type: "process", JobID: jobID, Status: j.CurrentStatus()}
+	resp := jobResponse{ProcessID: j.ProcessID(), Type: "process", JobID: jobID, Status: j.CurrentStatus(), Tags: params.Tags}
 	switch mode {
 	case "sync-execute":
 		j.Run()
@@ -420,12 +420,16 @@ func (rh *RESTHandler) JobStatusHandler(c echo.Context) (err error) {
 	jobID := c.Param("jobID")
 
 	if job, ok := rh.ActiveJobs.Jobs[jobID]; ok {
+		tags := (*job).TAGS()
+		if tags == nil {
+			tags = []string{}
+		}
 		resp := jobResponse{
 			ProcessID:  (*job).ProcessID(),
 			JobID:      (*job).JobID(),
 			LastUpdate: (*job).LastUpdate(),
 			Status:     (*job).CurrentStatus(),
-			Tags:       []string{},
+			Tags:       tags,
 		}
 		return prepareResponse(c, http.StatusOK, "jobStatus", resp)
 	} else if jRcrd, ok, err = rh.DB.GetJob(jobID); ok {
@@ -640,7 +644,12 @@ func (rh *RESTHandler) ListJobsHandler(c echo.Context) error {
 	tagsParam := c.QueryParam("tags")
 	var tagsList []string
 	if tagsParam != "" {
-		tagsList = strings.Split(tagsParam, ",")
+		for _, t := range strings.Split(tagsParam, ",") {
+			t = strings.TrimSpace(t)
+			if t != "" {
+				tagsList = append(tagsList, t)
+			}
+		}
 	}
 
 	var processIDList []string
@@ -694,14 +703,14 @@ func (rh *RESTHandler) ListJobsHandler(c echo.Context) error {
 	links := make([]link, 0)
 	if offset != 0 {
 		lnk := link{
-			Href:  fmt.Sprintf("/jobs?offset=%v&limit=%v&processID=%v&status=%v&submitter=%v", offset-limit, limit, processIDs, statuses, submitters),
+			Href:  fmt.Sprintf("/jobs?offset=%v&limit=%v&processID=%v&status=%v&submitter=%v&tags=%v", offset-limit, limit, processIDs, statuses, submitters, tagsParam),
 			Title: "prev",
 		}
 		links = append(links, lnk)
 	}
 	if limit == len(result) {
 		lnk := link{
-			Href:  fmt.Sprintf("/jobs?offset=%v&limit=%v&processID=%v&status=%v&submitter=%v", offset+limit, limit, processIDs, statuses, submitters),
+			Href:  fmt.Sprintf("/jobs?offset=%v&limit=%v&processID=%v&status=%v&submitter=%v&tags=%v", offset+limit, limit, processIDs, statuses, submitters, tagsParam),
 			Title: "next",
 		}
 		links = append(links, lnk)

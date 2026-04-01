@@ -167,11 +167,11 @@ func (pgDB *PostgresDB) GetJobs(limit, offset int, processIDs, statuses, submitt
 			args = append(args, sb)
 		}
 	}
-	// Tag filtering: @> means "contains all of" (AND logic)
+	// Tag filtering: prefix match — each tag term must prefix-match at least one element
 	for _, tag := range tags {
-		whereClauses = append(whereClauses, fmt.Sprintf("array_to_string(tags, ',') ILIKE $%d", argIndex))
+		whereClauses = append(whereClauses, fmt.Sprintf("EXISTS (SELECT 1 FROM unnest(tags) t WHERE t ILIKE $%d)", argIndex))
 		argIndex++
-		args = append(args, "%"+tag+"%")
+		args = append(args, tag+"%")
 	}
 
 	if len(whereClauses) > 0 {
