@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/docker/docker/api/types/container"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -304,6 +305,13 @@ func (j *DockerJob) Run() {
 	resources := controllers.DockerResources{}
 	resources.NanoCPUs = int64(j.Resources.CPUs * 1e9)         // Docker controller needs cpu in nano ints
 	resources.Memory = int64(j.Resources.Memory * 1024 * 1024) // Docker controller needs memory in bytes
+	if j.Resources.GPUs > 0 {
+		resources.DeviceRequests = []container.DeviceRequest{{
+			Driver:       "nvidia",
+			Count:        int(j.Resources.GPUs),
+			Capabilities: [][]string{{"gpu"}},
+		}}
+	}
 
 	// although we have already checked if image is available at the time of process init, we are doing it again just to be explicit
 	err = c.EnsureImage(j.ctx, j.Image, false)

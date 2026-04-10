@@ -64,6 +64,11 @@ func (c *DockerController) ContainerRun(ctx context.Context, imageName string, c
 		Resources: container.Resources(resources),
 	}
 
+	// Set device requests (for GPUs) from resources
+	if len(resources.DeviceRequests) > 0 {
+		hostConfig.DeviceRequests = resources.DeviceRequests
+	}
+
 	mounts := make([]mount.Mount, len(volumes))
 	for i, volumeSpec := range volumes {
 		parts := strings.Split(volumeSpec, ":") // this has been already validated

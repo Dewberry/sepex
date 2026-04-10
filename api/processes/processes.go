@@ -78,6 +78,7 @@ type Outputs struct {
 type Resources struct {
 	CPUs   float32 `yaml:"cpus" json:"cpus,omitempty"`
 	Memory int     `yaml:"memory" json:"memory,omitempty"`
+	GPUs   int     `yaml:"gpus" json:"gpus,omitempty"`
 }
 
 type Host struct {
@@ -361,6 +362,9 @@ func (p *Process) Validate(maxCPUs float32, maxMemory int) error {
 		}
 		if maxMemory > 0 && p.Config.Resources.Memory > maxMemory {
 			return fmt.Errorf("process requires %dMB memory but max allowed is %dMB", p.Config.Resources.Memory, maxMemory)
+		}
+		if p.Config.Resources.GPUs < 0 {
+			return errors.New("process requires an invalid gpu count")
 		}
 	}
 
