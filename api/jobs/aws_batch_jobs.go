@@ -72,6 +72,10 @@ func (j *AWSBatchJob) ProcessID() string {
 	return j.ProcessName
 }
 
+func (j *AWSBatchJob) TAGS() []string {
+	return j.Tags
+}
+
 func (j *AWSBatchJob) SUBMITTER() string {
 	return j.Submitter
 }

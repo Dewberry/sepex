@@ -68,6 +68,10 @@ func (j *SubprocessJob) SUBMITTER() string {
 	return j.Submitter
 }
 
+func (j *SubprocessJob) TAGS() []string {
+	return j.Tags
+}
+
 func (j *SubprocessJob) CMD() []string {
 	return j.Cmd
 }

@@ -39,7 +39,7 @@ Example payload:
   "inputs": {
     "text": "Hello World"
   },
-  "tags": ["example", "test"],
+  "tags": ["example", "test"]
 }
 ```
 

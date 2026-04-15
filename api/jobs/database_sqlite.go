@@ -184,10 +184,11 @@ func (sqliteDB *SQLiteDB) GetJobs(limit, offset int, processIDs, statuses, submi
 			args = append(args, sb)
 		}
 	}
-	// Tag filtering: job must contain ALL requested tags (AND logic)
+	// Tag filtering: prefix match — e.g. "v1" matches "v1", "v1.2", "v1-beta"
+	// Pattern: wrap column in commas, then match ",<prefix>%," to anchor at tag boundaries
 	for _, tag := range tags {
 		whereClauses = append(whereClauses, `(',' || LOWER(tags) || ',') LIKE LOWER(?)`)
-		args = append(args, "%,"+strings.ToLower(tag)+",%")
+		args = append(args, "%,"+strings.ToLower(tag)+"%,%")
 	}
 
 	if len(whereClauses) > 0 {

@@ -70,6 +70,10 @@ func (j *DockerJob) SUBMITTER() string {
 	return j.Submitter
 }
 
+func (j *DockerJob) TAGS() []string {
+	return j.Tags
+}
+
 func (j *DockerJob) CMD() []string {
 	return j.Cmd
 }
