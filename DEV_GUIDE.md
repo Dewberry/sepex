@@ -1,19 +1,22 @@
 ## Config
+
 - All secrets and configuration settings are handled through environment variables
 - There is an example.env provided to ease the configuration process
 - Command line flags are available for config that is only needed at startup, they take precedence over the environment variables when used.
 - Other configs are defined through env variables so that they can be modified without restarting the server.
 - Here is the resolution order:
-    - Flag, where option is available and used
-    - Environment variable
-    - Default value, where available
+  - Flag, where option is available and used
+  - Environment variable
+  - Default value, where available
 
 ## Process Specific Env
+
 - They must start with ALL CAPS process id.
 - They will be passed to jobs with process id prefix removed. This allow setting 3rd party env variables such as GDAL_NUM_CPUS etc.
 - We are parsing at the job level so as to allow dynamic updates without having to restart server
 
 ## Auth
+
 - If auth is enabled some or all routes are protected based on env variable `AUTH_LEVEL` settings.
 - The middleware validate and parse JWT to verify `X-SEPEX-User-Email` header and inject `X-SEPEX-User-Roles` header.
 - A user can use tools like Postman to set these headers themselves, but if auth is enabled, they will be checked against the token. This setup allows adding submitter info to the database when auth is not enabled.
@@ -25,9 +28,23 @@
 - Only admins can add/update/delete processes.
 
 ## Inputs
-- If `"Inputs": {}` in `/execution` payload. Nothing will be appended to process commands. This allow running processes that do not have any inputs.
+
+- If `"inputs": {}` in `/execution` payload, nothing will be appended to process commands. This allows running processes that do not have any inputs.
+- `"tags"` (optional) can be included as an array of strings in the `/execution` payload. Tags are stored with the job record and can be used to filter jobs when querying `/jobs`. If omitted, the job will be created with an empty tag list.
+
+Example payload:
+
+```JSON
+{
+  "inputs": {
+    "text": "Hello World"
+  },
+  "tags": ["example", "test"]
+}
+```
 
 ## Scope
+
 - The behavior of logging is unknown for AWS Batch processes with job definitions having number of attempts more than 1.
 
 ## Local Scheduler
@@ -54,7 +71,6 @@ Recovery rebuilds in-memory state after a restart using DB non-terminal jobs.
 
 1. Metadata for recovered jobs will be incomplete but present.
 
-
 ## Release/Versioning/Changelog
 
 The project uses an automated release workflow triggered by semver tags (e.g., `v1.0.0`, `v1.0.0-beta`). The workflow validates prerequisites, runs security scans, builds multi-platform container images, and creates GitHub releases with auto-generated release notes.
@@ -68,6 +84,7 @@ The project uses an automated release workflow triggered by semver tags (e.g., `
    - Release workflow fails if version is missing from CHANGELOG.md
 
 2. **Create and Push a Semver Tag**
+
    ```bash
    # For a regular release
    git tag v1.0.0
@@ -91,6 +108,3 @@ The project uses an automated release workflow triggered by semver tags (e.g., `
    - Go to Actions tab → Release workflow → Run workflow
    - Select the tag from the dropdown
    - This is useful for re-running a release if needed
-
-
-

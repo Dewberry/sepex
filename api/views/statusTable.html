@@ -25,6 +25,10 @@
         </td>
     </tr>
     <tr>
+        <td class="bold">Tags</td>
+        <td>{{range .Tags}}<span class="tag">{{.}}</span> {{end}}</td>
+    </tr>
+    <tr>
         <td class="bold">Last Updated</td>
         <td>{{.LastUpdate.Format "2006-01-02 15:04:05 MST"}}</td>
     </tr>

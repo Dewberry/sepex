@@ -303,3 +303,12 @@ code[class*="language-"] {
 .legend-available {
     background-color: var(--table-row-even-bg);
 }
+
+.tag {
+    display: inline-block;
+    padding: 0.15rem 0.4rem;
+    margin: 0.1rem;
+    font-size: 0.85em;
+    border: 1px solid var(--table-border-color);
+    border-radius: 3px;
+}

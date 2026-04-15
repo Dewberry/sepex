@@ -29,6 +29,7 @@ type Job interface {
 	ProcessID() string
 	ProcessVersionID() string
 	SUBMITTER() string
+	TAGS() []string
 
 	// UpdateProcessLogs must provide most upto date process logs
 	// for containerized processes, first fetch the current container logs
@@ -89,6 +90,7 @@ type JobRecord struct {
 	HostJobID  string    `json:"hostJobID,omitempty"`
 	Mode       string    `json:"mode,omitempty"`
 	Submitter  string    `json:"submitter"`
+	Tags       []string  `json:"tags"`
 }
 
 type LogEntry struct {

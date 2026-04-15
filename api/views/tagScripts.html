@@ -1,0 +1,14 @@
+<script>
+document.querySelectorAll('.tag').forEach(function(el) {
+    var text = el.textContent.trim().toLowerCase();
+    var hash = 0;
+    for (var i = 0; i < text.length; i++) {
+        hash = text.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    var hue = Math.abs(hash) % 360;
+    var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    el.style.backgroundColor = 'hsl(' + hue + ',' + (isDark ? '35%' : '50%') + ',' + (isDark ? '20%' : '88%') + ')';
+    el.style.color = 'hsl(' + hue + ',' + (isDark ? '50%' : '60%') + ',' + (isDark ? '80%' : '25%') + ')';
+    el.style.borderColor = 'hsl(' + hue + ',' + (isDark ? '30%' : '40%') + ',' + (isDark ? '35%' : '70%') + ')';
+});
+</script>

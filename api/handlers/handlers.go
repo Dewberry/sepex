@@ -39,6 +39,7 @@ type jobResponse struct {
 	ProcessID  string      `json:"processID,omitempty"`
 	Message    string      `json:"message,omitempty"`
 	Outputs    interface{} `json:"outputs,omitempty"`
+	Tags       []string    `json:"tags"`
 }
 
 type link struct {
@@ -97,6 +98,7 @@ func prepareResponse(c echo.Context, httpStatus int, renderName string, output i
 // specs: https://developer.ogc.org/api/processes/index.html#tag/Execute
 type runRequestBody struct {
 	Inputs map[string]interface{} `json:"inputs"`
+	Tags   []string               `json:"tags"`
 }
 
 // LandingPage godoc
@@ -190,6 +192,14 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 	if params.Inputs == nil {
 		return c.JSON(http.StatusBadRequest, errResponse{Message: "'inputs' is required in the body of the request"})
 	}
+	if params.Tags == nil {
+		params.Tags = []string{} // default to empty if not provided
+	}
+
+	err = utils.SanitizeTags(params.Tags)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, errResponse{Message: err.Error()})
+	}
 
 	err = p.VerifyInputs(params.Inputs)
 	if err != nil {
@@ -246,6 +256,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			StorageSvc:     rh.StorageSvc,
 			DB:             rh.DB,
 			DoneChan:       rh.MessageQueue.JobDone,
+			Tags:           params.Tags,
 			ResourcePool:   rh.ResourcePool,
 			IsSync:         mode == "sync-execute",
 		}
@@ -265,6 +276,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			StorageSvc:     rh.StorageSvc,
 			DB:             rh.DB,
 			DoneChan:       rh.MessageQueue.JobDone,
+			Tags:           params.Tags,
 		}
 
 	case "subprocess":
@@ -279,6 +291,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 			StorageSvc:     rh.StorageSvc,
 			DB:             rh.DB,
 			DoneChan:       rh.MessageQueue.JobDone,
+			Tags:           params.Tags,
 			ResourcePool:   rh.ResourcePool,
 			IsSync:         mode == "sync-execute",
 		}
@@ -304,7 +317,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 		c.Response().Header().Set("Preference-Applied", modeResult.PreferenceApplied)
 	}
 
-	resp := jobResponse{ProcessID: j.ProcessID(), Type: "process", JobID: jobID, Status: j.CurrentStatus()}
+	resp := jobResponse{ProcessID: j.ProcessID(), Type: "process", JobID: jobID, Status: j.CurrentStatus(), Tags: params.Tags}
 	switch mode {
 	case "sync-execute":
 		j.Run()
@@ -405,20 +418,31 @@ func (rh *RESTHandler) JobStatusHandler(c echo.Context) (err error) {
 
 	var jRcrd jobs.JobRecord
 	jobID := c.Param("jobID")
+
 	if job, ok := rh.ActiveJobs.Jobs[jobID]; ok {
+		tags := (*job).TAGS()
+		if tags == nil {
+			tags = []string{}
+		}
 		resp := jobResponse{
 			ProcessID:  (*job).ProcessID(),
 			JobID:      (*job).JobID(),
 			LastUpdate: (*job).LastUpdate(),
 			Status:     (*job).CurrentStatus(),
+			Tags:       tags,
 		}
 		return prepareResponse(c, http.StatusOK, "jobStatus", resp)
 	} else if jRcrd, ok, err = rh.DB.GetJob(jobID); ok {
+		if jRcrd.Tags == nil {
+			jRcrd.Tags = []string{}
+		}
+
 		resp := jobResponse{
 			ProcessID:  jRcrd.ProcessID,
 			JobID:      jRcrd.JobID,
 			LastUpdate: jRcrd.LastUpdate,
 			Status:     jRcrd.Status,
+			Tags:       jRcrd.Tags,
 		}
 		return prepareResponse(c, http.StatusOK, "jobStatus", resp)
 	}
@@ -617,6 +641,16 @@ func (rh *RESTHandler) ListJobsHandler(c echo.Context) error {
 	processIDs := c.QueryParam("processID") // assuming comma-separated list: "process1,process2"
 	statuses := c.QueryParam("status")
 	submitters := c.QueryParam("submitter")
+	tagsParam := c.QueryParam("tags")
+	var tagsList []string
+	if tagsParam != "" {
+		for _, t := range strings.Split(tagsParam, ",") {
+			t = strings.TrimSpace(t)
+			if t != "" {
+				tagsList = append(tagsList, t)
+			}
+		}
+	}
 
 	var processIDList []string
 	if processIDs != "" {
@@ -660,7 +694,7 @@ func (rh *RESTHandler) ListJobsHandler(c echo.Context) error {
 		offset = 0
 	}
 
-	result, err := rh.DB.GetJobs(limit, offset, processIDList, statusList, submittersList)
+	result, err := rh.DB.GetJobs(limit, offset, processIDList, statusList, submittersList, tagsList)
 	if err != nil {
 		output := errResponse{HTTPStatus: http.StatusInternalServerError, Message: err.Error()}
 		return prepareResponse(c, http.StatusNotFound, "error", output)
@@ -669,14 +703,14 @@ func (rh *RESTHandler) ListJobsHandler(c echo.Context) error {
 	links := make([]link, 0)
 	if offset != 0 {
 		lnk := link{
-			Href:  fmt.Sprintf("/jobs?offset=%v&limit=%v&processID=%v&status=%v&submitter=%v", offset-limit, limit, processIDs, statuses, submitters),
+			Href:  fmt.Sprintf("/jobs?offset=%v&limit=%v&processID=%v&status=%v&submitter=%v&tags=%v", offset-limit, limit, processIDs, statuses, submitters, tagsParam),
 			Title: "prev",
 		}
 		links = append(links, lnk)
 	}
 	if limit == len(result) {
 		lnk := link{
-			Href:  fmt.Sprintf("/jobs?offset=%v&limit=%v&processID=%v&status=%v&submitter=%v", offset+limit, limit, processIDs, statuses, submitters),
+			Href:  fmt.Sprintf("/jobs?offset=%v&limit=%v&processID=%v&status=%v&submitter=%v&tags=%v", offset+limit, limit, processIDs, statuses, submitters, tagsParam),
 			Title: "next",
 		}
 		links = append(links, lnk)
