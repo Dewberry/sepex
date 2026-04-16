@@ -152,6 +152,30 @@ func (rh *RESTHandler) Conformance(c echo.Context) error {
 	return prepareResponse(c, http.StatusOK, "conformance", output)
 }
 
+// ProcessSchemaPage godoc
+// @Summary Process YAML Schema
+// @Description Human-readable HTML rendering of the full SEPEX process YAML schema.
+// @Tags schemas
+// @Accept */*
+// @Produce html
+// @Success 200 {string} string
+// @Router /schemas/process [get]
+func (rh *RESTHandler) ProcessSchemaPage(c echo.Context) error {
+	return c.File("public/schemas/process.html")
+}
+
+// ProcessSchemaJSON godoc
+// @Summary Process YAML JSON Schema
+// @Description Machine-readable JSON Schema for the full SEPEX process definition file.
+// @Tags schemas
+// @Accept */*
+// @Produce application/json
+// @Success 200 {object} map[string]interface{}
+// @Router /schemas/process.json [get]
+func (rh *RESTHandler) ProcessSchemaJSON(c echo.Context) error {
+	return c.File("public/schemas/process.json")
+}
+
 // @Summary Execute Process
 // @Description [Execute Process Specification](https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_create_job)
 // @Tags processes

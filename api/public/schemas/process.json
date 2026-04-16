@@ -1,0 +1,208 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Process YAML Schema",
+  "description": "JSON Schema for full SEPEX process definition YAML files.",
+  "type": "object",
+  "properties": {
+    "info": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Semantic version of the process definition."
+        },
+        "id": {
+          "type": "string",
+          "description": "Unique process identifier."
+        },
+        "title": {
+          "type": "string",
+          "description": "User-facing process title."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the process."
+        },
+        "jobControlOptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The supported job control options for this process."
+        },
+        "outputTransmission": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "string"
+          },
+          "description": "Transmission modes supported by the process output."
+        }
+      },
+      "required": ["version", "id", "title", "description", "jobControlOptions"],
+      "additionalProperties": false
+    },
+    "host": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Execution platform type, e.g. docker, subprocess, aws-batch."
+        },
+        "jobDefinition": {
+          "type": "string",
+          "description": "AWS Batch job definition name for aws-batch hosts."
+        },
+        "jobQueue": {
+          "type": "string",
+          "description": "AWS Batch job queue name for aws-batch hosts."
+        },
+        "image": {
+          "type": "string",
+          "description": "Container image for docker hosts."
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "command": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "string"
+      },
+      "description": "Command arguments appended to the process execution entrypoint."
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "envVars": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "A list of environment variables that the process expects."
+        },
+        "volumes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "A list of mount bindings in the form hostPath:containerPath."
+        },
+        "maxResources": {
+          "type": "object",
+          "properties": {
+            "cpus": {
+              "type": "number",
+              "description": "Maximum CPU resources requested for a local process."
+            },
+            "memory": {
+              "type": "integer",
+              "description": "Maximum memory in megabytes requested for a local process."
+            },
+            "gpus": {
+              "type": "integer",
+              "description": "Optional GPU resources requested for a local process."
+            }
+          },
+          "additionalProperties": false,
+          "description": "Local execution resource limits."
+        }
+      },
+      "additionalProperties": false
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "input": {
+            "type": "object",
+            "properties": {
+              "literalDataDomain": {
+                "type": "object",
+                "properties": {
+                  "dataType": {
+                    "type": "string"
+                  },
+                  "valueDefinition": {
+                    "type": "object",
+                    "properties": {
+                      "anyValue": {
+                        "type": "boolean"
+                      },
+                      "possibleValues": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["dataType"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["literalDataDomain"],
+            "additionalProperties": false
+          },
+          "minOccurs": {
+            "type": "integer"
+          },
+          "maxOccurs": {
+            "type": "integer"
+          }
+        },
+        "required": ["id", "title", "description", "input", "minOccurs", "maxOccurs"],
+        "additionalProperties": false
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "output": {
+            "type": "object",
+            "properties": {
+              "transmissionMode": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["transmissionMode"],
+            "additionalProperties": false
+          },
+          "inputId": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "title", "description", "output"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["info", "host", "config", "inputs"],
+  "additionalProperties": false
+}
