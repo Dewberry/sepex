@@ -24,7 +24,7 @@ https://developer.ogc.org/api/processes/index.html
 
 ### Linux using Docker
 
-1. Create docker network `docker network create process_api_net`
+1. Create docker network `docker network create sepex_net`
 
 1. Build docker images for example plugins
 ```sh
