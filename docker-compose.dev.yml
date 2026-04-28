@@ -3,7 +3,9 @@ include:
 
 services:
   api:
+    build:
+      target: dev
     ports:
-      - '80:5050'
+      - '5050:5050'
     volumes:
-      - ./api/plugins:/app/plugins
+      - ./api:/app

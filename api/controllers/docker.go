@@ -17,7 +17,7 @@ import (
 	"github.com/labstack/gommon/log"
 )
 
-const DOCKER_NETWORK = "process_api_net"
+const DOCKER_NETWORK = "sepex_net"
 
 type ContainerInfo struct {
 	Exists   bool
