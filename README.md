@@ -7,13 +7,13 @@
 An [OGC API - Processes](https://docs.ogc.org/is/18-062r2/18-062r2.html#toc0) compliant server for executing encapsulated (containerized, CLI, ...) processes locally or on a cloud at scale.
 
 SEPEX provides:
-- job queuing 
+- job queuing
 - job tracking
 - job logs
 - job metadata
 - job results
 
-  
+
 
 The API responses follow the examples provided here:
 https://developer.ogc.org/api/processes/index.html
@@ -30,14 +30,16 @@ https://developer.ogc.org/api/processes/index.html
 ```sh
 cd plugin-examples &&
 chmod +x build.sh &&
-./build.sh &
+./build.sh
 ```
-1. Create a `.env` file (example below) at the root of this repo.
+1. Create a `.env` file at the root of this repo by copying [example.env](example.env) and updating values as needed.
 ![](imgs/readme/getting-started.gif)
-1. Add/Delete process configuration file(s) (yaml) to the [plugins](plugins/) directory as needed
+1. Add/Delete process configuration file(s) (yaml) to the [plugins](api/plugins/) directory as needed.
+Note: `PLUGINS_LOAD_DIR` paths in `.env` are relative to the container filesystem, not the host.
 1. Run `docker compose up`
-1. Create a bucket in the minio console (http://localhost:9001).
-1. Test endpoints using the swagger documentation page. (http://localhost:5050/swagger/index.html)
+1. Create a bucket in the MinIO console (http://localhost:9001) with the name matching `STORAGE_BUCKET` in your `.env` (default: `sepex-storage`).
+1. Test endpoints using the swagger documentation page (http://localhost:5050/swagger/index.html).
+1. To enable authentication, see the [Auth section in DEV_GUIDE.md](DEV_GUIDE.md#auth). Keycloak is included in the Docker Compose stack and accessible at http://localhost:8080.
 
 ![](imgs/readme/swagger-demo.gif)
 

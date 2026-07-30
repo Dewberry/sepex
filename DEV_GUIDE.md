@@ -27,6 +27,22 @@
 - Requests from Admin Role are allowed to retrieve all jobs information, non admins can only retrieve information for jobs that they submitted.
 - Only admins can add/update/delete processes.
 
+### Keycloak Setup
+
+Keycloak is included in the Docker Compose stack and runs at http://localhost:8080.
+
+1. Log in to the Keycloak admin console using the `KC_BOOTSTRAP_ADMIN_USERNAME` and `KC_BOOTSTRAP_ADMIN_PASSWORD` credentials from your `.env`.
+2. Create a new realm (e.g., `sepex`).
+3. Create an OpenID Connect client with direct access grants enabled.
+4. Create realm roles matching `AUTH_ADMIN_ROLE` (default: `admin`) and each process ID (e.g., `pyecho`, `pywrite`) that non-admin users should be able to execute.
+5. Create users with the appropriate roles assigned. Keycloak 26+ requires first and last name on user profiles.
+6. Update your `.env`:
+```
+AUTH_SERVICE='keycloak'
+AUTH_LEVEL='1'
+KEYCLOAK_PUBLIC_KEYS_URL='http://keycloak:8080/realms/<realm-name>/protocol/openid-connect/certs'
+```
+
 ## Inputs
 
 - If `"inputs": {}` in `/execution` payload, nothing will be appended to process commands. This allows running processes that do not have any inputs.
