@@ -278,11 +278,7 @@ func recoverAWSBatchJobsFromRecords(
 	records []JobRecord,
 ) error {
 
-	batchCtl, err := controllers.NewAWSBatchController(
-		os.Getenv("AWS_ACCESS_KEY_ID"),
-		os.Getenv("AWS_SECRET_ACCESS_KEY"),
-		os.Getenv("AWS_REGION"),
-	)
+	batchCtl, err := controllers.NewAWSBatchController()
 	if err != nil {
 		return err
 	}

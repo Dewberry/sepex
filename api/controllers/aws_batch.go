@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/batch"
 )
@@ -68,14 +67,13 @@ func getResourceRequirement(resourceRequirements []*batch.ResourceRequirement, n
 	return ""
 }
 
-func NewAWSBatchController(accessKey, secretAccessKey, region string) (*AWSBatchController, error) {
-	sess, err := session.NewSession(&aws.Config{
-		Credentials: credentials.NewStaticCredentialsFromCreds(credentials.Value{
-			AccessKeyID:     accessKey,
-			SecretAccessKey: secretAccessKey,
-		}),
-		Region: aws.String(region)},
-	)
+// Region and credentials are both resolved by the SDK: the region from
+// AWS_REGION, and credentials from the default chain, being environment
+// variables (including AWS_SESSION_TOKEN), the shared credentials file, or the
+// ECS/EC2 instance role. This lets deployments authenticate with an IAM role
+// instead of static keys.
+func NewAWSBatchController() (*AWSBatchController, error) {
+	sess, err := session.NewSession()
 	if err != nil {
 		return nil, err
 	}

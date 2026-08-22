@@ -216,7 +216,7 @@ func MarshallProcess(f string) (Process, error) {
 	// the problem with doing this here is that if the job definition is updated while we are doing this, our process info will not update
 	switch p.Host.Type {
 	case "aws-batch":
-		c, err := controllers.NewAWSBatchController(os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY"), os.Getenv("AWS_REGION"))
+		c, err := controllers.NewAWSBatchController()
 		if err != nil {
 			return Process{}, err
 		}

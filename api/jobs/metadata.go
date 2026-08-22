@@ -44,9 +44,7 @@ type metaData struct {
 func getECRImageDigest(imgURI string) (string, error) {
 	var imgDgst string
 
-	sess, err := session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	})
+	sess, err := session.NewSession()
 	if err != nil {
 		return "", err
 	}

@@ -251,7 +251,7 @@ func (j *AWSBatchJob) Create() error {
 	j.ctx = ctx
 	j.ctxCancel = cancelFunc
 
-	batchContext, err := controllers.NewAWSBatchController(os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY"), os.Getenv("AWS_REGION"))
+	batchContext, err := controllers.NewAWSBatchController()
 	if err != nil {
 		j.ctxCancel()
 		return err
@@ -299,7 +299,7 @@ func (j *AWSBatchJob) Kill() error {
 		return fmt.Errorf("can't call delete on an already completed, failed, or dismissed job")
 	}
 
-	c, err := controllers.NewAWSBatchController(os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY"), os.Getenv("AWS_REGION"))
+	c, err := controllers.NewAWSBatchController()
 	if err != nil {
 		j.logger.Errorf("Could not send kill signal to AWS Batch API. Error: %s", err.Error())
 		return err
@@ -323,7 +323,7 @@ func (j *AWSBatchJob) Kill() error {
 
 // Get log stream name for this job
 func (j *AWSBatchJob) getLogStreamName() (err error) {
-	c, err := controllers.NewAWSBatchController(os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY"), os.Getenv("AWS_DEFAULT_REGION"))
+	c, err := controllers.NewAWSBatchController()
 	if err != nil {
 		return
 	}
@@ -351,9 +351,7 @@ func (j *AWSBatchJob) fetchCloudWatchLogs() ([]string, error) {
 		}
 	}
 
-	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(os.Getenv("AWS_REGION")),
-	})
+	sess, err := session.NewSession()
 	if err != nil {
 		return nil, fmt.Errorf("Error creating session: %w", err)
 	}
@@ -419,7 +417,7 @@ func (j *AWSBatchJob) WriteMetaData() {
 	defer j.wg.Done()
 	defer j.logger.Info("Finished metadata writing routine.")
 
-	c, err := controllers.NewAWSBatchController(os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY"), os.Getenv("AWS_REGION"))
+	c, err := controllers.NewAWSBatchController()
 	if err != nil {
 		j.logger.Errorf("Error writing metadata: %s", err.Error())
 	}
