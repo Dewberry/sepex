@@ -23,8 +23,20 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - The `image` block now carries a `digestSource` field saying how the digest was determined.
 
+#### GET /admin/resources
+
+- Response now includes `usedGPUs`, `queuedGPUs`, `maxGPUs`, and a `gpus` array listing every device with its index, UUID, and the job holding it. The HTML view shows each device as free or in use rather than as a utilization bar, since which device is free is the question that matters. There are no GPU percentage fields, deliberately.
+
+### Features
+
+- GPUs can now be requested by `docker` processes with `gpus` under `maxResources`, and are **enforced**: a job receives exactly the devices allocated to it, and no other job is placed on them. This is unlike `cpus` and `memory`, which remain advisory scheduling hints and are now documented as such. See [GPU_GUIDE.md](GPU_GUIDE.md).
+- GPU requests that could never be satisfied are rejected at submission with `422` rather than queued indefinitely: more GPUs than the host has, or any GPUs on a `subprocess` process. Process registration is unaffected, so one catalog still loads on GPU and non-GPU hosts alike.
+- Restart recovery reclaims the specific devices a surviving container holds, read back from the container itself, rather than a device count.
+
 ### Configuration
 
+- New `MAX_LOCAL_GPUS` environment variable (flag `-mlg`, default: all detected GPUs) capping how many GPUs the local job queue may allocate. Unlike `MAX_LOCAL_CPUS` and `MAX_LOCAL_MEMORY_MB`, a value that cannot be verified against detected hardware is fatal at startup, because GPUs are enforced and an over-claim would put two jobs on one card.
+- New `SKIP_GPU_VERIFICATION` environment variable (flag `--skip-gpu-verify`, default: `false`) to trust `MAX_LOCAL_GPUS` without enumerating devices, for deployments where the API cannot see the GPUs it schedules onto. Note that a containerized SEPEX cannot see host GPUs unless the API container is itself given GPU visibility.
 - New `SEPEX_DOCKER_NETWORK` environment variable (default: `sepex_net`) to set the docker network that launched job containers are attached to. Set it to `host` to run them with host networking, which is required on EC2 for instance profile credential access.
 - AWS credentials (S3 and Batch) are now resolved through the default AWS credential chain rather than read directly from `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Deployments that set those variables are unaffected, deployments without them can authenticate with an ECS/EC2 instance role, and `AWS_SESSION_TOKEN` is now honored for temporary credentials. MinIO continues to use its own `MINIO_*` keys.
 - Optional new IAM permission `ecs:DescribeTasks` is added. It lets AWS Batch jobs record the digest ECS actually pulled. If not provided, jobs using a moving tag fall back to asking the registry and record `tag-lookup`.

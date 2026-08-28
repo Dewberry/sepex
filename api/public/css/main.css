@@ -304,6 +304,56 @@ code[class*="language-"] {
     background-color: var(--table-row-even-bg);
 }
 
+/* GPUs are allocated as whole, exclusive devices, so each one is shown
+   individually rather than folded into a utilization bar: a percentage cannot
+   say which device is free, which is the only question worth asking here. */
+.gpu-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 8px;
+    max-width: 600px;
+}
+
+.gpu-device {
+    min-width: 120px;
+    padding: 10px 12px;
+    border: 1px solid var(--table-border-color);
+    border-radius: 4px;
+    background-color: var(--table-row-even-bg);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.gpu-device-busy {
+    border-left: 5px solid var(--bar-used-color);
+}
+
+.gpu-device-free {
+    border-left: 5px solid var(--table-border-color);
+}
+
+.gpu-device-index {
+    font-weight: bold;
+}
+
+.gpu-device-state {
+    font-size: 0.85em;
+    color: var(--font-color-gray);
+}
+
+.gpu-device-job {
+    font-family: monospace;
+    font-size: 0.85em;
+}
+
+.gpu-device-uuid {
+    font-family: monospace;
+    font-size: 0.75em;
+    color: var(--font-color-gray);
+}
+
 .tag {
     display: inline-block;
     padding: 0.15rem 0.4rem;

@@ -32,11 +32,16 @@ command:
 
 config:
   # max resources the container can use
+  # cpus and memory are advisory, they inform scheduling but are not enforced
+  # gpus is enforced, the container receives exactly the devices allocated to it
   maxResources:
     # cpus in fraction for example, 0.5 would mean use 0.5 CPUs
     cpus: 0.1
     # memory in megabytes
     memory: 1024
+    # whole GPUs, defaults to 0, fractions not allowed
+    # the image must carry its own CUDA runtime libraries, see GPU_GUIDE.md
+    gpus: 0
   # env variable keys that need to be passed to container, for AEPGRID_AWS_ACCESS_KEY_ID etc
   # they would be passed to the container with prefix AEPGRID_ removed
   envVars:

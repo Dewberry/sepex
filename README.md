@@ -121,6 +121,35 @@ When a local job (docker or subprocess) reaches a finished state (successful or 
 
 The API responds to all GET requests as HTML or JSON depending upon if the request is being originated from Browser or not or if it specifies the format using query parameter ‘f’.
 
+### Resource Management
+
+Local jobs (docker and subprocess) declare what they need in their process
+config, and the queue uses those numbers to decide how many jobs run at once.
+How strictly each resource is held to differs, and the difference is deliberate:
+
+| Resource | Docker       | Subprocess    | AWS Batch |
+|----------|--------------|---------------|-----------|
+| `cpus`   | advisory     | advisory      | ignored   |
+| `memory` | advisory     | advisory      | ignored   |
+| `gpus`   | **enforced** | not supported | ignored   |
+
+`cpus` and `memory` are an honor system. The declared values inform scheduling
+only; nothing prevents a process from exceeding them at runtime. Docker's CPU
+limit throttles rather than reserves and its memory limit kills rather than
+reserves, so neither can guarantee a job the capacity it asked for. Using them
+purely for scheduling is the honest option.
+
+`gpus` is enforced, because a GPU cannot work that way: GPU memory does not
+overflow gracefully, a device cannot be subdivided, and a container is given no
+GPU at all unless one is requested explicitly. SEPEX therefore allocates whole
+devices and tells Docker exactly which ones a container may use.
+
+AWS Batch jobs use no local resources; their allocation comes from the Batch
+job definition.
+
+See [GPU_GUIDE.md](GPU_GUIDE.md) for declaring GPUs, configuring the server,
+and troubleshooting.
+
 ### Logs
 
 ![](imgs/readme/logs.png)

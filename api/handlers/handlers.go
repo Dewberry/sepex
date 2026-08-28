@@ -848,18 +848,35 @@ func (rh *RESTHandler) JobStatusUpdateHandler(c echo.Context) error {
 
 // }
 
+// gpuResponse reports one GPU and, when allocated, the job holding it.
+type gpuResponse struct {
+	Index int    `json:"index"`
+	UUID  string `json:"uuid,omitempty"`
+	// JobID is empty when the device is free.
+	JobID string `json:"jobID,omitempty"`
+}
+
 // resourcesResponse provides resource utilization data for JSON API and HTML rendering
+//
+// GPUs carry no percentage fields. They are allocated as whole, exclusive
+// devices, so "50% utilized" would not answer the question that matters, which
+// is which device is free. The per-device list answers it instead.
 type resourcesResponse struct {
 	UsedCPUs      float32 `json:"usedCPUs"`
 	UsedMemory    int     `json:"usedMemory"`
+	UsedGPUs      int     `json:"usedGPUs"`
 	QueuedCPUs    float32 `json:"queuedCPUs"`
 	QueuedMemory  int     `json:"queuedMemory"`
+	QueuedGPUs    int     `json:"queuedGPUs"`
 	MaxCPUs       float32 `json:"maxCPUs"`
 	MaxMemory     int     `json:"maxMemory"`
+	MaxGPUs       int     `json:"maxGPUs"`
 	UsedCPUsPct   float32 `json:"usedCPUsPct"`
 	QueuedCPUsPct float32 `json:"queuedCPUsPct"`
 	UsedMemPct    float32 `json:"usedMemPct"`
 	QueuedMemPct  float32 `json:"queuedMemPct"`
+	// GPUs lists every device, allocated and free alike, in index order.
+	GPUs []gpuResponse `json:"gpus"`
 }
 
 // @Summary Resource Status
@@ -877,13 +894,22 @@ func (rh *RESTHandler) ResourceStatusHandler(c echo.Context) error {
 
 	status := rh.ResourcePool.GetStatus()
 
+	gpus := make([]gpuResponse, len(status.GPUs))
+	for i, g := range status.GPUs {
+		gpus[i] = gpuResponse{Index: g.Index, UUID: g.UUID, JobID: g.JobID}
+	}
+
 	resources := resourcesResponse{
 		UsedCPUs:     status.UsedCPUs,
 		UsedMemory:   status.UsedMemory,
+		UsedGPUs:     status.UsedGPUs,
 		QueuedCPUs:   status.QueuedCPUs,
 		QueuedMemory: status.QueuedMemory,
+		QueuedGPUs:   status.QueuedGPUs,
 		MaxCPUs:      status.MaxCPUs,
 		MaxMemory:    status.MaxMemory,
+		MaxGPUs:      status.MaxGPUs,
+		GPUs:         gpus,
 	}
 
 	if status.MaxCPUs > 0 {
