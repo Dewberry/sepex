@@ -83,7 +83,8 @@ func (qw *QueueWorker) tryStartJobs() {
 		}
 
 		res := (*job).GetResources()
-		if !qw.resourcePool.TryReserve(res.CPUs, res.Memory) {
+		assigned, ok := qw.resourcePool.TryReserve((*job).JobID(), res.CPUs, res.Memory, 0)
+		if !ok {
 			return // Not enough resources, wait for release
 		}
 
@@ -91,13 +92,14 @@ func (qw *QueueWorker) tryStartJobs() {
 		removed := qw.pendingJobs.Remove((*job).JobID())
 		if removed == nil {
 			// Job disappeared between peek and remove; release reservation and retry.
-			qw.resourcePool.Release(res.CPUs, res.Memory)
+			// assigned must be handed back explicitly, or the devices leak.
+			qw.resourcePool.Release(res.CPUs, res.Memory, assigned)
 			continue
 		}
 
 		// Job is leaving the queue and starting - update resource tracking.
 		// Resources removed from "queued" (TryReserve already added to "used").
-		qw.resourcePool.RemoveQueued(res.CPUs, res.Memory)
+		qw.resourcePool.RemoveQueued(res.CPUs, res.Memory, 0)
 
 		log.Infof("Starting job %s", (*removed).JobID())
 		go (*removed).Run()

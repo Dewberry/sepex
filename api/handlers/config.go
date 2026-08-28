@@ -43,30 +43,7 @@ type ResourceLimits struct {
 	MaxGPUs   int
 	// GPUDevices are the specific devices this instance is allowed to hand
 	// out. Its length always equals MaxGPUs.
-	GPUDevices []GPUDevice
-}
-
-// GPUDevice identifies a single GPU that the resource pool can allocate.
-//
-// Unlike CPUs and memory, a GPU is allocated as a whole, exclusive unit and
-// the allocation is enforced at container launch, so the scheduler must track
-// device identity rather than a count.
-type GPUDevice struct {
-	Index int
-	// UUID is empty only when verification was skipped, since nothing then
-	// enumerated the hardware.
-	UUID string
-}
-
-// DeviceID returns the identifier to pass to Docker in a DeviceRequest.
-// Docker accepts either form. A UUID is preferred because it is stable across
-// reboots and driver reordering, but an index is all that is available when
-// verification is skipped.
-func (d GPUDevice) DeviceID() string {
-	if d.UUID != "" {
-		return d.UUID
-	}
-	return strconv.Itoa(d.Index)
+	GPUDevices []jobs.GPUDevice
 }
 
 // Config holds the configuration settings for the REST API server.
@@ -213,7 +190,7 @@ func NewRESTHander(gitTag string, maxLocalCPUs string, maxLocalMemory string, ma
 	config.PendingJobs = jobs.NewPendingJobs()
 
 	// Setup Resource Pool for tracking CPU/memory availability
-	config.ResourcePool = jobs.NewResourcePool(resourceLimits.MaxCPUs, resourceLimits.MaxMemory)
+	config.ResourcePool = jobs.NewResourcePool(resourceLimits.MaxCPUs, resourceLimits.MaxMemory, resourceLimits.GPUDevices)
 
 	// Setup Queue Worker to process pending jobs
 	config.QueueWorker = jobs.NewQueueWorker(config.PendingJobs, config.ResourcePool)
@@ -304,7 +281,7 @@ const gpuVisibilityHint = "If this host has GPUs, ensure the NVIDIA drivers are 
 // containers it launches can be given them. A failed probe therefore means
 // "unknown", not "none", and an explicit MAX_LOCAL_GPUS is trusted without
 // being cross-checked against it.
-func detectGPUs() ([]GPUDevice, bool) {
+func detectGPUs() ([]jobs.GPUDevice, bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -314,7 +291,7 @@ func detectGPUs() ([]GPUDevice, bool) {
 		return nil, false
 	}
 
-	var devices []GPUDevice
+	var devices []jobs.GPUDevice
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -335,7 +312,7 @@ func detectGPUs() ([]GPUDevice, bool) {
 			log.Warnf("GPU detection: missing GPU UUID in nvidia-smi row %q", line)
 			return nil, false
 		}
-		devices = append(devices, GPUDevice{Index: index, UUID: uuid})
+		devices = append(devices, jobs.GPUDevice{Index: index, UUID: uuid})
 	}
 
 	return devices, true
@@ -421,7 +398,7 @@ func parseMaxGPUs(value string) int {
 // containerized SEPEX launching sibling containers on the host daemon. It
 // makes MAX_LOCAL_GPUS authoritative and unchecked, which is acceptable only
 // because the operator has explicitly asserted it.
-func resolveGPUs(maxLocalGPUsStr string, skipVerification bool) (int, []GPUDevice) {
+func resolveGPUs(maxLocalGPUsStr string, skipVerification bool) (int, []jobs.GPUDevice) {
 	if skipVerification {
 		if maxLocalGPUsStr == "" {
 			log.Fatal("SKIP_GPU_VERIFICATION is set but MAX_LOCAL_GPUS is not; there is nothing to infer a GPU count from")
@@ -434,9 +411,9 @@ func resolveGPUs(maxLocalGPUsStr string, skipVerification bool) (int, []GPUDevic
 				"later as containers failing to start.", maxGPUs)
 		}
 
-		devices := make([]GPUDevice, maxGPUs)
+		devices := make([]jobs.GPUDevice, maxGPUs)
 		for i := range devices {
-			devices[i] = GPUDevice{Index: i}
+			devices[i] = jobs.GPUDevice{Index: i}
 		}
 		return maxGPUs, devices
 	}

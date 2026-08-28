@@ -168,7 +168,7 @@ func recoverDockerJobsFromRecords(
 				job.ResourcePool = resourcePool
 				if res, ok := processResources[r.ProcessID]; ok {
 					job.Resources = res
-					resourcePool.ReserveForce(res.CPUs, res.Memory)
+					resourcePool.ReserveForce(r.JobID, res.CPUs, res.Memory, nil)
 				} else {
 					log.Warnf("Recovery(docker): process resources not found job=%s process=%s", r.JobID, r.ProcessID)
 				}
@@ -186,7 +186,7 @@ func recoverDockerJobsFromRecords(
 func recoverRunningContainer(j *DockerJob, dockerCtl *controllers.DockerController) {
 	defer func() {
 		if j.ResourcePool != nil {
-			j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory)
+			j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory, nil)
 		}
 	}()
 	exitCode, err := dockerCtl.ContainerWait(context.TODO(), j.ContainerID)

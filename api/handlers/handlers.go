@@ -351,7 +351,7 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 		case *jobs.DockerJob, *jobs.SubprocessJob:
 			// Track queued resources, add to queue, and notify worker
 			res := j.GetResources()
-			rh.ResourcePool.AddQueued(res.CPUs, res.Memory)
+			rh.ResourcePool.AddQueued(res.CPUs, res.Memory, 0)
 			rh.PendingJobs.Enqueue(&j)
 			rh.QueueWorker.NotifyNewJob()
 		}
@@ -393,7 +393,7 @@ func (rh *RESTHandler) JobDismissHandler(c echo.Context) error {
 	if removed != nil {
 		// Job was in queue - update queued resource tracking
 		res := (*removed).GetResources()
-		rh.ResourcePool.RemoveQueued(res.CPUs, res.Memory)
+		rh.ResourcePool.RemoveQueued(res.CPUs, res.Memory, 0)
 	}
 
 	// 4. Kill the job

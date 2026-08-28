@@ -270,7 +270,7 @@ func (j *DockerJob) Create() error {
 	// Only reserve resources for sync jobs at creation time
 	// Async jobs will have resources reserved when QueueWorker starts them
 	if j.IsSync {
-		if !j.ResourcePool.TryReserve(j.Resources.CPUs, j.Resources.Memory) {
+		if _, ok := j.ResourcePool.TryReserve(j.UUID, j.Resources.CPUs, j.Resources.Memory, 0); !ok {
 			return fmt.Errorf("resources unavailable")
 		}
 	}
@@ -279,7 +279,7 @@ func (j *DockerJob) Create() error {
 	success := false
 	defer func() {
 		if !success && j.IsSync {
-			j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory)
+			j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory, nil)
 		}
 	}()
 
@@ -327,7 +327,7 @@ func (j *DockerJob) Run() {
 			j.logger.Errorf("Run() panicked: %v", r)
 			j.NewStatusUpdate(FAILED, time.Time{})
 		}
-		j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory)
+		j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory, nil)
 		j.Close()
 		j.wgRun.Done()
 	}()
