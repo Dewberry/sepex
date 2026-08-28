@@ -1857,7 +1857,7 @@
              "listen": "prerequest",
              "script": {
               "exec": [
-               "postman.setGlobalVariable('timestampUtc', (new Date()).toISOString());"
+               "pm.globals.set('timestampUtc', (new Date()).toISOString());"
               ],
               "type": "text/javascript"
              }
@@ -1967,7 +1967,7 @@
              "listen": "prerequest",
              "script": {
               "exec": [
-               "postman.setGlobalVariable('timestampUtc', (new Date()).toISOString());"
+               "pm.globals.set('timestampUtc', (new Date()).toISOString());"
               ],
               "type": "text/javascript"
              }

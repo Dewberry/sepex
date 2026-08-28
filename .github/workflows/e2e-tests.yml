@@ -30,7 +30,8 @@ jobs:
           echo TMP_JOB_LOGS_DIR='/.data/tmp/logs' >> .env
 
           echo MAX_LOCAL_CPUS=4 >> .env
-          echo MAX_LOCAL_MEMORY=4096 >> .env
+          echo MAX_LOCAL_MEMORY_MB=4096 >> .env
+          echo MAX_LOCAL_GPUS=0 >> .env
 
 
           echo MINIO_ACCESS_KEY_ID=user >> .env

@@ -1,0 +1,18 @@
+# Overlay used by the e2e suite so results do not depend on the host.
+#
+# Without this the queue limits come from the machine: MAX_LOCAL_CPUS defaults
+# to 80% of the host's cores, so a resource-contention test that expects a job
+# to be refused on an 8-core box quietly passes on a 32-core one. Pinning the
+# limits makes those tests mean the same thing everywhere.
+#
+# `environment` takes precedence over `env_file`, so these win over .env.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d
+services:
+  api:
+    environment:
+      MAX_LOCAL_CPUS: "4"
+      MAX_LOCAL_MEMORY_MB: "4096"
+      # 0 everywhere except the GPU suite, which sets E2E_GPUS=1. A value above
+      # the number of devices actually present is fatal at startup by design.
+      MAX_LOCAL_GPUS: "${E2E_GPUS:-0}"
