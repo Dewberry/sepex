@@ -277,6 +277,7 @@ func main() {
 		processResources[p.Info.ID] = jobs.Resources{
 			CPUs:   p.Config.Resources.CPUs,
 			Memory: p.Config.Resources.Memory,
+			GPUs:   p.Config.Resources.GPUs,
 		}
 	}
 	if err := jobs.RecoverAllJobs(

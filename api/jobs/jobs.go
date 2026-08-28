@@ -13,9 +13,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Resources is what a job needs from the host. Field order must stay identical
+// to processes.Resources, which handlers converts from directly.
 type Resources struct {
 	CPUs   float32
 	Memory int
+	GPUs   int
 }
 
 // Job refers to any process that has been created through

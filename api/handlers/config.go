@@ -202,7 +202,7 @@ func NewRESTHander(gitTag string, maxLocalCPUs string, maxLocalMemory string, ma
 
 	// Create local logs directory if not exist
 	pluginsDir := os.Getenv("PLUGINS_DIR") // We already know this env variable exist because it is being checked in plguinsInit function
-	processList, err := pr.LoadProcesses(pluginsDir, resourceLimits.MaxCPUs, resourceLimits.MaxMemory)
+	processList, err := pr.LoadProcesses(pluginsDir, resourceLimits.MaxCPUs, resourceLimits.MaxMemory, resourceLimits.MaxGPUs)
 	if err != nil {
 		log.Fatal(err)
 	}
