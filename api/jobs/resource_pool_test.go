@@ -203,3 +203,100 @@ func TestConcurrentReserveNeverDoubleAllocates(t *testing.T) {
 		t.Errorf("UsedGPUs = %d, want %d", used, devices)
 	}
 }
+
+func TestLookupGPUsMatchesEitherIdentifierForm(t *testing.T) {
+	rp := NewResourcePool(8, 8192, testDevices(3))
+
+	// Containers started while verification was on carry UUIDs.
+	found, unresolved := rp.LookupGPUs([]string{"GPU-2", "GPU-0"})
+	if len(unresolved) != 0 {
+		t.Fatalf("unresolved = %v, want none", unresolved)
+	}
+	if len(found) != 2 || found[0].Index != 2 || found[1].Index != 0 {
+		t.Errorf("found = %v, want devices 2 and 0 in that order", found)
+	}
+
+	// Containers started while verification was skipped carry bare indices.
+	found, unresolved = rp.LookupGPUs([]string{"1"})
+	if len(unresolved) != 0 || len(found) != 1 || found[0].Index != 1 {
+		t.Errorf("found=%v unresolved=%v, want device 1 and nothing unresolved", found, unresolved)
+	}
+}
+
+func TestLookupGPUsReportsUnknownIdentifiers(t *testing.T) {
+	rp := NewResourcePool(8, 8192, testDevices(2))
+
+	found, unresolved := rp.LookupGPUs([]string{"GPU-0", "GPU-from-another-host", "7"})
+	if len(found) != 1 || found[0].Index != 0 {
+		t.Errorf("found = %v, want only device 0", found)
+	}
+	if len(unresolved) != 2 {
+		t.Errorf("unresolved = %v, want both unknown identifiers", unresolved)
+	}
+}
+
+func TestReclaimContainerGPUsReturnsExactDevices(t *testing.T) {
+	rp := NewResourcePool(8, 8192, testDevices(4))
+
+	// A survivor holds GPU 2 specifically, not "one GPU".
+	reclaimed := reclaimContainerGPUs(rp, "survivor", []string{"GPU-2"})
+	if len(reclaimed) != 1 || reclaimed[0].Index != 2 {
+		t.Fatalf("reclaimed = %v, want exactly device 2", reclaimed)
+	}
+
+	rp.ReserveForce("survivor", 1, 100, reclaimed)
+	assigned, ok := rp.TryReserve("newcomer", 1, 100, 3)
+	if !ok {
+		t.Fatal("could not reserve the three remaining GPUs")
+	}
+	for _, d := range assigned {
+		if d.Index == 2 {
+			t.Fatal("GPU 2 was handed out while the recovered container still held it")
+		}
+	}
+}
+
+func TestReclaimContainerGPUsIgnoresUnrecognisedDevices(t *testing.T) {
+	rp := NewResourcePool(8, 8192, testDevices(2))
+
+	// An identifier this pool cannot name is reported and skipped rather than
+	// guessed at, so the pool stays fully available.
+	reclaimed := reclaimContainerGPUs(rp, "survivor", []string{"GPU-from-another-host"})
+	if len(reclaimed) != 0 {
+		t.Fatalf("reclaimed = %v, want nothing for an unrecognised device", reclaimed)
+	}
+
+	rp.ReserveForce("survivor", 0, 0, reclaimed)
+	if _, ok := rp.TryReserve("newcomer", 1, 100, 2); !ok {
+		t.Error("the pool was withheld even though nothing recognisable was reclaimed")
+	}
+}
+
+func TestReclaimContainerGPUsKeepsRecognisedDevicesWhenMixed(t *testing.T) {
+	rp := NewResourcePool(8, 8192, testDevices(3))
+
+	// One identifier resolves, one does not. The resolvable device must still
+	// be protected rather than discarded along with the unknown one.
+	reclaimed := reclaimContainerGPUs(rp, "survivor", []string{"GPU-1", "GPU-from-another-host"})
+	if len(reclaimed) != 1 || reclaimed[0].Index != 1 {
+		t.Fatalf("reclaimed = %v, want exactly device 1", reclaimed)
+	}
+
+	rp.ReserveForce("survivor", 0, 0, reclaimed)
+	assigned, ok := rp.TryReserve("newcomer", 1, 100, 2)
+	if !ok {
+		t.Fatal("could not reserve the two devices that remain free")
+	}
+	for _, d := range assigned {
+		if d.Index == 1 {
+			t.Error("GPU 1 was handed out while the recovered container held it")
+		}
+	}
+}
+
+func TestReclaimContainerGPUsNoDevices(t *testing.T) {
+	rp := NewResourcePool(8, 8192, testDevices(2))
+	if got := reclaimContainerGPUs(rp, "cpu-only-job", nil); got != nil {
+		t.Errorf("reclaimed %v for a job with no GPUs, want nil", got)
+	}
+}

@@ -38,6 +38,11 @@ type ContainerInfo struct {
 	// is fixed for the container's lifetime, so it identifies what actually
 	// ran even if the tag it was started from moves later.
 	ImageID string
+	// GPUDeviceIDs are the device identifiers the container was created with.
+	// The container is the authoritative record of which GPUs a job holds,
+	// which is what lets recovery reclaim exactly those without needing a
+	// database column to remember them.
+	GPUDeviceIDs []string
 }
 
 type DockerController struct {
@@ -272,11 +277,23 @@ func (c *DockerController) ContainerInfo(ctx context.Context, containerID string
 		exitCode = inspect.State.ExitCode
 	}
 
+	var gpuDeviceIDs []string
+	if inspect.HostConfig != nil {
+		for _, req := range inspect.HostConfig.Resources.DeviceRequests {
+			// An empty driver is how a plain `--gpus` request is recorded.
+			if req.Driver != "" && req.Driver != "nvidia" {
+				continue
+			}
+			gpuDeviceIDs = append(gpuDeviceIDs, req.DeviceIDs...)
+		}
+	}
+
 	return ContainerInfo{
-		Exists:   true,
-		Running:  running,
-		ExitCode: exitCode,
-		ImageID:  inspect.Image,
+		Exists:       true,
+		Running:      running,
+		ExitCode:     exitCode,
+		ImageID:      inspect.Image,
+		GPUDeviceIDs: gpuDeviceIDs,
 	}, nil
 }
 

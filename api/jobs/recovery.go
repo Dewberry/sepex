@@ -166,12 +166,24 @@ func recoverDockerJobsFromRecords(
 		if info.Running {
 			if resourcePool != nil {
 				job.ResourcePool = resourcePool
+
+				// GPUs are reclaimed from the container itself, which records
+				// the devices it was created with. That is authoritative even
+				// when the process config has since changed or been removed,
+				// and reclaiming by count instead would mark the wrong devices
+				// busy -- causing the very collision this feature prevents.
+				job.assignedGPUs = reclaimContainerGPUs(resourcePool, r.JobID, info.GPUDeviceIDs)
+
+				// CPU and memory have no equivalent record, so they still come
+				// from the process. A missing entry leaves them at zero, which
+				// under-counts usage but never blocks the pool.
 				if res, ok := processResources[r.ProcessID]; ok {
 					job.Resources = res
-					resourcePool.ReserveForce(r.JobID, res.CPUs, res.Memory, nil)
 				} else {
 					log.Warnf("Recovery(docker): process resources not found job=%s process=%s", r.JobID, r.ProcessID)
 				}
+
+				resourcePool.ReserveForce(r.JobID, job.Resources.CPUs, job.Resources.Memory, job.assignedGPUs)
 			}
 			go recoverRunningContainer(job, dockerCtl)
 		} else {
@@ -180,6 +192,41 @@ func recoverDockerJobsFromRecords(
 	}
 
 	return nil
+}
+
+// reclaimContainerGPUs maps the device identifiers a surviving container was
+// created with back onto the pool's devices.
+//
+// Identifiers that resolve are reserved for the job. Identifiers that do not
+// are reported and otherwise ignored, consistent with how the rest of recovery
+// treats what it cannot account for: SEPEX does not reason about hardware it
+// cannot name. The realistic causes are a lowered MAX_LOCAL_GPUS, changed
+// hardware, or SKIP_GPU_VERIFICATION toggled between restarts, which switches
+// identifiers between UUIDs and bare indices.
+//
+// The risk this accepts is that an unrecognised identifier turns out to be a
+// device the pool can allocate, in which case a later job lands on hardware
+// that is already busy and dies with an out-of-memory error. Nothing downstream
+// can detect that, so the warning below is the only signal and has to name the
+// devices and say plainly what may follow.
+func reclaimContainerGPUs(rp *ResourcePool, jobID string, deviceIDs []string) []GPUDevice {
+	if len(deviceIDs) == 0 {
+		return nil
+	}
+
+	devices, unresolved := rp.LookupGPUs(deviceIDs)
+	if len(unresolved) > 0 {
+		log.Warnf("Recovery(docker): job=%s is running on GPU device(s) %v that this pool does not "+
+			"recognise, so they will NOT be reserved. If they are in fact devices this pool can "+
+			"allocate, a later job may be placed on the same hardware and fail with an out-of-memory "+
+			"error. Check whether MAX_LOCAL_GPUS or SKIP_GPU_VERIFICATION changed since this job started.",
+			jobID, unresolved)
+	}
+
+	if len(devices) > 0 {
+		log.Infof("Recovery(docker): job=%s reclaimed GPU device(s) %v", jobID, gpuIndices(devices))
+	}
+	return devices
 }
 
 // recoverRunningContainer waits for the container to exit, then finalizes the job.

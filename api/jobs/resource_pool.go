@@ -196,6 +196,32 @@ func (rp *ResourcePool) knownGPULocked(index int) bool {
 	return false
 }
 
+// LookupGPUs resolves Docker device identifiers back onto this pool's devices,
+// returning what matched and what did not.
+//
+// An identifier is matched against both the UUID and the index, because which
+// form was written into a container depends on whether GPU verification was
+// enabled when it started, and that can differ from the current setting.
+func (rp *ResourcePool) LookupGPUs(deviceIDs []string) (found []GPUDevice, unresolved []string) {
+	rp.mu.RLock()
+	defer rp.mu.RUnlock()
+
+	for _, id := range deviceIDs {
+		matched := false
+		for _, d := range rp.gpus {
+			if id == d.UUID || id == strconv.Itoa(d.Index) {
+				found = append(found, d)
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			unresolved = append(unresolved, id)
+		}
+	}
+	return found, unresolved
+}
+
 // Release returns resources to the pool when a job finishes.
 // devices must be the ones handed out by TryReserve or ReserveForce; passing
 // a device that is not currently allocated is logged and ignored.
