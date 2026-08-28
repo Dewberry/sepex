@@ -143,7 +143,7 @@ func (j *DockerJob) UpdateProcessLogs() (err error) {
 		return
 	}
 
-	j.logger.Debug("Updating container logss")
+	j.logger.Debug("Updating container logs")
 	containerLogs, err := j.fetchContainerLogs()
 	if err != nil {
 		j.logger.Error(err.Error())

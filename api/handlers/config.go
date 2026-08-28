@@ -3,15 +3,18 @@ package handlers
 import (
 	"app/jobs"
 	pr "app/processes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -37,6 +40,33 @@ func (t Template) Render(w io.Writer, name string, data interface{}, c echo.Cont
 type ResourceLimits struct {
 	MaxCPUs   float32
 	MaxMemory int // in MB
+	MaxGPUs   int
+	// GPUDevices are the specific devices this instance is allowed to hand
+	// out. Its length always equals MaxGPUs.
+	GPUDevices []GPUDevice
+}
+
+// GPUDevice identifies a single GPU that the resource pool can allocate.
+//
+// Unlike CPUs and memory, a GPU is allocated as a whole, exclusive unit and
+// the allocation is enforced at container launch, so the scheduler must track
+// device identity rather than a count.
+type GPUDevice struct {
+	Index int
+	// UUID is empty only when verification was skipped, since nothing then
+	// enumerated the hardware.
+	UUID string
+}
+
+// DeviceID returns the identifier to pass to Docker in a DeviceRequest.
+// Docker accepts either form. A UUID is preferred because it is stable across
+// reboots and driver reordering, but an index is all that is available when
+// verification is skipped.
+func (d GPUDevice) DeviceID() string {
+	if d.UUID != "" {
+		return d.UUID
+	}
+	return strconv.Itoa(d.Index)
 }
 
 // Config holds the configuration settings for the REST API server.
@@ -87,7 +117,7 @@ func prettyPrint(v interface{}) string {
 
 // Initializes resources and return a new handler
 // errors are fatal
-func NewRESTHander(gitTag string, maxLocalCPUs string, maxLocalMemory string) *RESTHandler {
+func NewRESTHander(gitTag string, maxLocalCPUs string, maxLocalMemory string, maxLocalGPUs string, skipGPUVerification string) *RESTHandler {
 	apiName, exist := os.LookupEnv("API_NAME")
 	if !exist {
 		log.Warn("env variable API_NAME not set")
@@ -99,7 +129,7 @@ func NewRESTHander(gitTag string, maxLocalCPUs string, maxLocalMemory string) *R
 	}
 
 	// Calculate resource limits once at startup
-	resourceLimits := newResourceLimits(maxLocalCPUs, maxLocalMemory)
+	resourceLimits := newResourceLimits(maxLocalCPUs, maxLocalMemory, maxLocalGPUs, skipGPUVerification)
 
 	// working with pointers here so as not to copy large templates, yamls, and ActiveJobs
 	config := RESTHandler{
@@ -256,10 +286,70 @@ func NewStorageService(providerType string) (*s3.S3, error) {
 	}
 }
 
+// gpuVisibilityHint explains the ways a host with GPUs can still fail to detect
+// them, and how to proceed when it cannot. Detection runs in the API process,
+// which is frequently itself a container holding only the docker socket, so a
+// negative result may be a visibility problem rather than absent hardware.
+const gpuVisibilityHint = "If this host has GPUs, ensure the NVIDIA drivers are installed; " +
+	"if SEPEX itself is running in a container, that container must also be given GPU visibility " +
+	"(`--gpus all`, or compose `deploy.resources.reservations.devices`). Where the API genuinely " +
+	"cannot see the GPUs it schedules onto, set SKIP_GPU_VERIFICATION=true (--skip-gpu-verify) " +
+	"together with MAX_LOCAL_GPUS to trust that count unverified."
+
+// detectGPUs probes the host for NVIDIA GPUs via nvidia-smi.
+//
+// The boolean reports whether the probe itself succeeded, which is distinct
+// from finding zero devices. When SEPEX runs inside a container with only the
+// docker socket mounted it cannot see host GPUs, even though the sibling
+// containers it launches can be given them. A failed probe therefore means
+// "unknown", not "none", and an explicit MAX_LOCAL_GPUS is trusted without
+// being cross-checked against it.
+func detectGPUs() ([]GPUDevice, bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	out, err := exec.CommandContext(ctx, "nvidia-smi", "--query-gpu=index,uuid", "--format=csv,noheader").Output()
+	if err != nil {
+		log.Debugf("GPU detection unavailable: %v", err)
+		return nil, false
+	}
+
+	var devices []GPUDevice
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		indexStr, uuid, found := strings.Cut(line, ",")
+		if !found {
+			log.Warnf("GPU detection: unparseable nvidia-smi row %q", line)
+			return nil, false
+		}
+		index, err := strconv.Atoi(strings.TrimSpace(indexStr))
+		if err != nil {
+			log.Warnf("GPU detection: unparseable GPU index in nvidia-smi row %q", line)
+			return nil, false
+		}
+		uuid = strings.TrimSpace(uuid)
+		if uuid == "" {
+			log.Warnf("GPU detection: missing GPU UUID in nvidia-smi row %q", line)
+			return nil, false
+		}
+		devices = append(devices, GPUDevice{Index: index, UUID: uuid})
+	}
+
+	return devices, true
+}
+
 // newResourceLimits creates ResourceLimits from the provided values.
 // Values come from CLI flags which already have env var fallback via resolveValue().
 // Falls back to 80% of system CPUs and 8GB memory if not specified.
-func newResourceLimits(maxLocalCPUsStr string, maxLocalMemoryStr string) *ResourceLimits {
+//
+// CPU and memory misconfiguration is warned about and defaulted, because those
+// limits are only advisory inputs to the queue. GPU misconfiguration is fatal:
+// GPUs are enforced at container launch, an over-claim would hand the same
+// device to two jobs rather than merely slowing one down.
+func newResourceLimits(maxLocalCPUsStr string, maxLocalMemoryStr string, maxLocalGPUsStr string, skipGPUVerificationStr string) *ResourceLimits {
 	numCPUs := float32(runtime.NumCPU())
 
 	// Default to 80% of system CPUs
@@ -282,10 +372,91 @@ func newResourceLimits(maxLocalCPUsStr string, maxLocalMemoryStr string) *Resour
 		}
 	}
 
-	log.Infof("ResourceLimits initialized: maxCPUs=%.2f, maxMemory=%dMB", maxCPUs, maxMemory)
+	skipGPUVerification := false
+	if skipGPUVerificationStr != "" {
+		parsed, err := strconv.ParseBool(skipGPUVerificationStr)
+		if err != nil {
+			log.Fatalf("Invalid SKIP_GPU_VERIFICATION value %q: must be a boolean", skipGPUVerificationStr)
+		}
+		skipGPUVerification = parsed
+	}
+
+	maxGPUs, gpuDevices := resolveGPUs(maxLocalGPUsStr, skipGPUVerification)
+
+	log.Infof("ResourceLimits initialized: maxCPUs=%.2f, maxMemory=%dMB, maxGPUs=%d", maxCPUs, maxMemory, maxGPUs)
 
 	return &ResourceLimits{
-		MaxCPUs:   maxCPUs,
-		MaxMemory: maxMemory,
+		MaxCPUs:    maxCPUs,
+		MaxMemory:  maxMemory,
+		MaxGPUs:    maxGPUs,
+		GPUDevices: gpuDevices,
 	}
+}
+
+// parseMaxGPUs parses MAX_LOCAL_GPUS. Unlike the CPU and memory limits, an
+// unusable value is fatal rather than defaulted, because silently falling back
+// to 0 would disable every GPU process with no signal.
+func parseMaxGPUs(value string) int {
+	parsed, err := strconv.Atoi(value)
+	switch {
+	case err != nil:
+		log.Fatalf("Invalid MAX_LOCAL_GPUS value %q: must be an integer", value)
+	case parsed < 0:
+		log.Fatalf("Invalid MAX_LOCAL_GPUS value %d: must not be negative", parsed)
+	}
+	return parsed
+}
+
+// resolveGPUs determines how many GPUs this instance may schedule and which
+// devices those are.
+//
+// A failed probe is indistinguishable from a host with no GPUs, because on a
+// CPU-only machine nvidia-smi is simply absent. Neither case may be overridden
+// by MAX_LOCAL_GPUS alone: a device that cannot be enumerated cannot be
+// verified, and accepting the value would admit jobs that only fail later,
+// when the container runtime rejects a device that does not exist.
+//
+// skipVerification is the deliberate escape hatch for deployments where the
+// API genuinely cannot see the GPUs it schedules onto -- most commonly a
+// containerized SEPEX launching sibling containers on the host daemon. It
+// makes MAX_LOCAL_GPUS authoritative and unchecked, which is acceptable only
+// because the operator has explicitly asserted it.
+func resolveGPUs(maxLocalGPUsStr string, skipVerification bool) (int, []GPUDevice) {
+	if skipVerification {
+		if maxLocalGPUsStr == "" {
+			log.Fatal("SKIP_GPU_VERIFICATION is set but MAX_LOCAL_GPUS is not; there is nothing to infer a GPU count from")
+		}
+
+		maxGPUs := parseMaxGPUs(maxLocalGPUsStr)
+		if maxGPUs > 0 {
+			log.Warnf("GPU verification skipped: trusting MAX_LOCAL_GPUS=%d without enumerating devices. "+
+				"Devices are addressed by index rather than UUID, and an incorrect count will surface "+
+				"later as containers failing to start.", maxGPUs)
+		}
+
+		devices := make([]GPUDevice, maxGPUs)
+		for i := range devices {
+			devices[i] = GPUDevice{Index: i}
+		}
+		return maxGPUs, devices
+	}
+
+	detected, probed := detectGPUs()
+
+	if maxLocalGPUsStr == "" {
+		if len(detected) == 0 {
+			log.Warnf("GPU detection found 0 GPUs; GPU processes cannot run on this instance. %s", gpuVisibilityHint)
+		}
+		return len(detected), detected
+	}
+
+	maxGPUs := parseMaxGPUs(maxLocalGPUsStr)
+	switch {
+	case maxGPUs > 0 && !probed:
+		log.Fatalf("MAX_LOCAL_GPUS is %d but no GPU could be detected on this host. %s "+
+			"Set MAX_LOCAL_GPUS=0 to run without GPUs.", maxGPUs, gpuVisibilityHint)
+	case maxGPUs > len(detected):
+		log.Fatalf("MAX_LOCAL_GPUS is %d but only %d GPU(s) were detected on this host", maxGPUs, len(detected))
+	}
+	return maxGPUs, detected[:maxGPUs]
 }

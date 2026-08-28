@@ -42,6 +42,8 @@ var (
 	authLvl        string
 	maxLocalCPUs   string
 	maxLocalMemory string
+	maxLocalGPUs   string
+	skipGPUVerify  string
 )
 
 func init() {
@@ -71,6 +73,8 @@ func init() {
 	flag.StringVar(&authLvl, "al", resolveValue("AUTH_LEVEL", "0"), "specify the authorization striction level")
 	flag.StringVar(&maxLocalCPUs, "mlc", resolveValue("MAX_LOCAL_CPUS", ""), "max CPUs for local jobs (default: 80% of system CPUs)")
 	flag.StringVar(&maxLocalMemory, "mlm", resolveValue("MAX_LOCAL_MEMORY_MB", ""), "max memory in MB for local jobs (default: 8192)")
+	flag.StringVar(&maxLocalGPUs, "mlg", resolveValue("MAX_LOCAL_GPUS", ""), "max GPUs for local jobs (default: all detected)")
+	flag.StringVar(&skipGPUVerify, "skip-gpu-verify", resolveValue("SKIP_GPU_VERIFICATION", ""), "trust MAX_LOCAL_GPUS without enumerating devices, for deployments where the API cannot see host GPUs")
 
 	flag.Parse()
 }
@@ -264,7 +268,7 @@ func main() {
 	initPlugins()
 
 	// Initialize resources
-	rh := handlers.NewRESTHander(GitTag, maxLocalCPUs, maxLocalMemory)
+	rh := handlers.NewRESTHander(GitTag, maxLocalCPUs, maxLocalMemory, maxLocalGPUs, skipGPUVerify)
 	// todo: handle this error: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running
 	// todo: all non terminated job statuses should be updated to unknown
 	// todo: all logs in the logs directory should be moved to storage
