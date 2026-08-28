@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/docker/docker/api/types/container"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -46,6 +47,11 @@ type DockerJob struct {
 	// these empty.
 	imageDigest  string
 	digestSource string
+
+	// assignedGPUs are the specific devices the pool allocated to this job.
+	// Unlike CPU and memory, which are only accounted for, these are handed to
+	// Docker and must be released back verbatim.
+	assignedGPUs []GPUDevice
 
 	Resources
 	DB           Database
@@ -133,6 +139,11 @@ func (j *DockerJob) captureImageProvenance(c *controllers.DockerController) {
 
 func (j *DockerJob) GetResources() Resources {
 	return j.Resources
+}
+
+// AssignGPUs records the devices the pool allocated to this job.
+func (j *DockerJob) AssignGPUs(devices []GPUDevice) {
+	j.assignedGPUs = devices
 }
 
 // Update container logs
@@ -270,7 +281,8 @@ func (j *DockerJob) Create() error {
 	// Only reserve resources for sync jobs at creation time
 	// Async jobs will have resources reserved when QueueWorker starts them
 	if j.IsSync {
-		if _, ok := j.ResourcePool.TryReserve(j.UUID, j.Resources.CPUs, j.Resources.Memory, 0); !ok {
+		assigned, ok := j.ResourcePool.TryReserve(j.UUID, j.Resources.CPUs, j.Resources.Memory, j.Resources.GPUs)
+		if !ok {
 			// A GPU job that cannot start is not merely backlogged: whoever
 			// holds the device keeps it for their entire run, so the caller
 			// needs different advice than "retry shortly".
@@ -279,13 +291,14 @@ func (j *DockerJob) Create() error {
 			}
 			return ErrResourcesUnavailable
 		}
+		j.assignedGPUs = assigned
 	}
 
 	// Track if creation succeeded to handle cleanup on error
 	success := false
 	defer func() {
 		if !success && j.IsSync {
-			j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory, nil)
+			j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory, j.assignedGPUs)
 		}
 	}()
 
@@ -320,6 +333,30 @@ func (j *DockerJob) IsSyncJob() bool {
 	return j.IsSync
 }
 
+// gpuDeviceRequests builds the Docker device request for the allocated devices,
+// or nil when the job needs none.
+//
+// A container gets no GPU at all unless one is requested explicitly, and a
+// GPU-aware process would then silently fall back to CPU rather than fail.
+// Naming the devices also confines the job to the ones the pool allocated, so
+// concurrent jobs cannot land on the same card.
+func gpuDeviceRequests(devices []GPUDevice) []container.DeviceRequest {
+	if len(devices) == 0 {
+		return nil
+	}
+
+	deviceIDs := make([]string, len(devices))
+	for i, d := range devices {
+		deviceIDs[i] = d.DeviceID()
+	}
+
+	return []container.DeviceRequest{{
+		Driver:       "nvidia",
+		DeviceIDs:    deviceIDs,
+		Capabilities: [][]string{{"gpu"}},
+	}}
+}
+
 func (j *DockerJob) Run() {
 	// Single consolidated defer for all cleanup operations.
 	// Order of operations:
@@ -333,7 +370,7 @@ func (j *DockerJob) Run() {
 			j.logger.Errorf("Run() panicked: %v", r)
 			j.NewStatusUpdate(FAILED, time.Time{})
 		}
-		j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory, nil)
+		j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory, j.assignedGPUs)
 		j.Close()
 		j.wgRun.Done()
 	}()
@@ -363,6 +400,12 @@ func (j *DockerJob) Run() {
 	resources := controllers.DockerResources{}
 	resources.NanoCPUs = int64(j.Resources.CPUs * 1e9)         // Docker controller needs cpu in nano ints
 	resources.Memory = int64(j.Resources.Memory * 1024 * 1024) // Docker controller needs memory in bytes
+
+	resources.DeviceRequests = gpuDeviceRequests(j.assignedGPUs)
+	if len(j.assignedGPUs) > 0 {
+		j.logger.Infof("Allocated GPUs: indices %v, device ids %v",
+			gpuIndices(j.assignedGPUs), resources.DeviceRequests[0].DeviceIDs)
+	}
 
 	// although we have already checked if image is available at the time of process init, we are doing it again just to be explicit
 	err = c.EnsureImage(j.ctx, j.Image, false)

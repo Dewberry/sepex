@@ -186,7 +186,7 @@ func recoverDockerJobsFromRecords(
 func recoverRunningContainer(j *DockerJob, dockerCtl *controllers.DockerController) {
 	defer func() {
 		if j.ResourcePool != nil {
-			j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory, nil)
+			j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory, j.assignedGPUs)
 		}
 	}()
 	exitCode, err := dockerCtl.ContainerWait(context.TODO(), j.ContainerID)

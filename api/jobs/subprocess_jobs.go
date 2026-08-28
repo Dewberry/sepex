@@ -40,6 +40,8 @@ type SubprocessJob struct {
 	logger  *log.Logger
 	logFile *os.File
 
+	assignedGPUs []GPUDevice
+
 	Resources
 	DB           Database
 	StorageSvc   *s3.S3
@@ -78,6 +80,14 @@ func (j *SubprocessJob) CMD() []string {
 
 func (j *SubprocessJob) GetResources() Resources {
 	return j.Resources
+}
+
+// AssignGPUs records the devices the pool allocated to this job. It is always
+// empty today, since subprocess GPU requests are rejected at submission until
+// Phase II, but it is tracked so that anything the pool hands out is handed
+// back rather than leaked.
+func (j *SubprocessJob) AssignGPUs(devices []GPUDevice) {
+	j.assignedGPUs = devices
 }
 
 func (j *SubprocessJob) LogMessage(m string, level log.Level) {
@@ -179,7 +189,7 @@ func (j *SubprocessJob) Create() error {
 	success := false
 	defer func() {
 		if !success && j.IsSync {
-			j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory, nil)
+			j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory, j.assignedGPUs)
 		}
 	}()
 
@@ -228,7 +238,7 @@ func (j *SubprocessJob) Run() {
 			j.logger.Errorf("Run() panicked: %v", r)
 			j.NewStatusUpdate(FAILED, time.Time{})
 		}
-		j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory, nil)
+		j.ResourcePool.Release(j.Resources.CPUs, j.Resources.Memory, j.assignedGPUs)
 		j.Close()
 		j.wgRun.Done()
 	}()

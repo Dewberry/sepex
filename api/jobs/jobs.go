@@ -88,6 +88,12 @@ type Job interface {
 	// GetResources returns the CPU and memory resources for this job
 	GetResources() Resources
 
+	// AssignGPUs records the devices the pool allocated to this job. The job
+	// must hand back exactly these on release, so they are stored rather than
+	// recomputed. Callers that reserve on a job's behalf (QueueWorker) must
+	// call this before Run().
+	AssignGPUs(devices []GPUDevice)
+
 	// Run executes the job. Called by QueueWorker in a goroutine for Pending Jobs.
 	// Called by handler for sync jobs
 	Run()

@@ -83,7 +83,7 @@ func (qw *QueueWorker) tryStartJobs() {
 		}
 
 		res := (*job).GetResources()
-		assigned, ok := qw.resourcePool.TryReserve((*job).JobID(), res.CPUs, res.Memory, 0)
+		assigned, ok := qw.resourcePool.TryReserve((*job).JobID(), res.CPUs, res.Memory, res.GPUs)
 		if !ok {
 			return // Not enough resources, wait for release
 		}
@@ -99,7 +99,11 @@ func (qw *QueueWorker) tryStartJobs() {
 
 		// Job is leaving the queue and starting - update resource tracking.
 		// Resources removed from "queued" (TryReserve already added to "used").
-		qw.resourcePool.RemoveQueued(res.CPUs, res.Memory, 0)
+		qw.resourcePool.RemoveQueued(res.CPUs, res.Memory, res.GPUs)
+
+		// The job must own its devices before Run(), both to request them from
+		// Docker and to hand back exactly these when it finishes.
+		(*removed).AssignGPUs(assigned)
 
 		log.Infof("Starting job %s", (*removed).JobID())
 		go (*removed).Run()
