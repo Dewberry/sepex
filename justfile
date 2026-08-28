@@ -34,10 +34,16 @@ wipe: down
     -docker run --rm -v {{ justfile_directory() }}/.data/:/data alpine rm -rf /data/minio
     -docker run --rm -v {{ justfile_directory() }}/.data/:/data alpine rm -rf /data/api
 
+# Without `gpus=1` the GPU tests skip themselves. GH machine doesn't have a GPU, so it skips them.
+# Run the e2e suite including the GPU-only tests on machines with a GPU; leaves the stack up.
+test-e2e-gpu: wipe build-plugins build up
+    @just _wait-for-api
+    docker run --rm --network host -v "{{ justfile_directory() }}/tests/e2e:/etc/newman" postman/newman:6.1.3-alpine run tests.postman_collection.json --env-var "url=localhost:5050" --env-var "gpus=1" --reporters cli --bail --color on
+
 # Run the e2e suite against the local compose stack; leaves the stack up
 test-e2e: wipe build-plugins build up
     @just _wait-for-api
-    docker run --rm --network host -v "{{ justfile_directory() }}/tests/e2e:/etc/newman" postman/newman:5.3.1-alpine run tests.postman_collection.json --env-var "url=localhost:5050" --reporters cli --bail --color on
+    docker run --rm --network host -v "{{ justfile_directory() }}/tests/e2e:/etc/newman" postman/newman:6.1.3-alpine run tests.postman_collection.json --env-var "url=localhost:5050" --reporters cli --bail --color on
 
 # Block until the stack answers on :5050, dumping logs if it never does
 _wait-for-api:

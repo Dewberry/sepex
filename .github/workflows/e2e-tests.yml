@@ -96,7 +96,7 @@ jobs:
 
       - name: Run newman tests
         run: >
-          docker run --network="host" -v /home/runner/work/sepex/sepex/tests/e2e:/etc/newman/ postman/newman:5.3.1-alpine run tests.postman_collection.json
+          docker run --network="host" -v /home/runner/work/sepex/sepex/tests/e2e:/etc/newman/ postman/newman:6.1.3-alpine run tests.postman_collection.json
           --env-var "url=localhost:80" --reporters cli --bail --color on
 
       # Uncomment to print logs for debugging
