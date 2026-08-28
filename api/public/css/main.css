@@ -304,54 +304,61 @@ code[class*="language-"] {
     background-color: var(--table-row-even-bg);
 }
 
-/* GPUs are allocated as whole, exclusive devices, so each one is shown
+/* GPUs are allocated as whole, exclusive devices, so each one is drawn
    individually rather than folded into a utilization bar: a percentage cannot
-   say which device is free, which is the only question worth asking here. */
+   say which device is free, which is the only question worth asking here.
+   Each marker is one device, sized like the legend swatches so it carries the
+   same visual weight as the bars above. Detail lives in the title tooltip
+   rather than inside the box, which keeps the markers proportionate and needs
+   no javascript. */
 .gpu-grid {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-top: 8px;
+    margin-top: 6px;
     max-width: 600px;
 }
 
-.gpu-device {
-    min-width: 120px;
-    padding: 10px 12px;
+/* Queued markers are smaller, so they need less room between them. */
+.gpu-grid-queued {
+    gap: 9px;
+}
+
+.gpu-device,
+.gpu-queued-slot {
     border: 1px solid var(--table-border-color);
-    border-radius: 4px;
-    background-color: var(--table-row-even-bg);
+    border-radius: 3px;
+    box-sizing: border-box;
+}
+
+/* A queued marker is smaller than a device marker in the same proportion that
+   .bar-queued is smaller than .bar-container, so running and waiting read the
+   same here as they do for CPU and memory. */
+.gpu-device {
+    width: 30px;
+    height: 30px;
     display: flex;
-    flex-direction: column;
-    gap: 3px;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8em;
+    font-weight: bold;
+    text-decoration: none;
 }
 
 .gpu-device-busy {
-    border-left: 5px solid var(--bar-used-color);
+    background-color: var(--bar-used-color);
+    color: #fff;
 }
 
 .gpu-device-free {
-    border-left: 5px solid var(--table-border-color);
+    background-color: var(--table-row-even-bg);
+    color: var(--font-color);
 }
 
-.gpu-device-index {
-    font-weight: bold;
-}
-
-.gpu-device-state {
-    font-size: 0.85em;
-    color: var(--font-color-gray);
-}
-
-.gpu-device-job {
-    font-family: monospace;
-    font-size: 0.85em;
-}
-
-.gpu-device-uuid {
-    font-family: monospace;
-    font-size: 0.75em;
-    color: var(--font-color-gray);
+.gpu-queued-slot {
+    width: 20px;
+    height: 20px;
+    background-color: var(--bar-queued-color);
 }
 
 .tag {

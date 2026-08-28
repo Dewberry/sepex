@@ -877,6 +877,9 @@ type resourcesResponse struct {
 	QueuedMemPct  float32 `json:"queuedMemPct"`
 	// GPUs lists every device, allocated and free alike, in index order.
 	GPUs []gpuResponse `json:"gpus"`
+	// QueuedGPUSlots exists only so the HTML view can draw one marker per
+	// queued GPU; Go templates cannot range over a number.
+	QueuedGPUSlots []int `json:"-"`
 }
 
 // @Summary Resource Status
@@ -910,6 +913,8 @@ func (rh *RESTHandler) ResourceStatusHandler(c echo.Context) error {
 		MaxMemory:    status.MaxMemory,
 		MaxGPUs:      status.MaxGPUs,
 		GPUs:         gpus,
+
+		QueuedGPUSlots: make([]int, status.QueuedGPUs),
 	}
 
 	if status.MaxCPUs > 0 {
