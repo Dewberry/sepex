@@ -271,7 +271,13 @@ func (j *DockerJob) Create() error {
 	// Async jobs will have resources reserved when QueueWorker starts them
 	if j.IsSync {
 		if _, ok := j.ResourcePool.TryReserve(j.UUID, j.Resources.CPUs, j.Resources.Memory, 0); !ok {
-			return fmt.Errorf("resources unavailable")
+			// A GPU job that cannot start is not merely backlogged: whoever
+			// holds the device keeps it for their entire run, so the caller
+			// needs different advice than "retry shortly".
+			if j.Resources.GPUs > 0 {
+				return ErrGPUsUnavailable
+			}
+			return ErrResourcesUnavailable
 		}
 	}
 

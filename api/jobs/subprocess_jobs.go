@@ -169,7 +169,9 @@ func (j *SubprocessJob) Create() error {
 	// Async jobs will have resources reserved when QueueWorker starts them
 	if j.IsSync {
 		if _, ok := j.ResourcePool.TryReserve(j.UUID, j.Resources.CPUs, j.Resources.Memory, 0); !ok {
-			return fmt.Errorf("resources unavailable")
+			// Subprocess jobs never reach here needing GPUs; those are
+			// rejected at submission until implemented in the future.
+			return ErrResourcesUnavailable
 		}
 	}
 

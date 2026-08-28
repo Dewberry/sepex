@@ -3,6 +3,7 @@ package jobs
 import (
 	"app/utils"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -11,6 +12,19 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/labstack/gommon/log"
 	"github.com/sirupsen/logrus"
+)
+
+var (
+	// ErrResourcesUnavailable is returned when a sync job cannot reserve CPU
+	// or memory. These free up as jobs finish, so retrying later is reasonable
+	// advice.
+	ErrResourcesUnavailable = errors.New("resources unavailable")
+
+	// ErrGPUsUnavailable is returned when a sync job cannot reserve GPUs.
+	// It is distinct from ErrResourcesUnavailable because the advice differs:
+	// a GPU is held exclusively for a job's entire run, so the wait is
+	// unbounded and "retry shortly" is misleading.
+	ErrGPUsUnavailable = errors.New("gpus unavailable")
 )
 
 // Resources is what a job needs from the host. Field order must stay identical

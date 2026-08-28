@@ -9,8 +9,10 @@ package handlers
 
 import (
 	"app/jobs"
+	pr "app/processes"
 	"app/utils"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,6 +25,33 @@ import (
 	"github.com/labstack/gommon/log"
 	"github.com/sirupsen/logrus"
 )
+
+// rejectUnschedulableGPUs reports why a process's GPU requirement can never be
+// satisfied on this instance, or nil when it can be. It covers only the
+// permanent cases; a host with enough GPUs that are merely busy is a queueing
+// concern, not a submission error.
+func (rh *RESTHandler) rejectUnschedulableGPUs(p pr.Process) error {
+	gpus := p.Config.Resources.GPUs
+	if gpus <= 0 {
+		return nil
+	}
+
+	// aws-batch jobs draw on no local resources: their GPUs come from the
+	// Batch job definition, so the field is ignored exactly as cpus and memory
+	// already are.
+	if p.Host.Type != "docker" && p.Host.Type != "subprocess" {
+		return nil
+	}
+
+	if p.Host.Type == "subprocess" {
+		return fmt.Errorf("process %s requires %d GPU(s), but GPU allocation is not supported for subprocess processes", p.Info.ID, gpus)
+	}
+
+	if maxGPUs := rh.Config.ResourceLimits.MaxGPUs; gpus > maxGPUs {
+		return fmt.Errorf("process %s requires %d GPU(s) but this host has %d; the job can never be scheduled here", p.Info.ID, gpus, maxGPUs)
+	}
+	return nil
+}
 
 // base error
 type errResponse struct {
@@ -183,6 +212,14 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 		}
 	}
 
+	// GPU requirements are checked here rather than at process registration, so
+	// that one catalog stays loadable on GPU and non-GPU hosts alike. The cost
+	// of that choice is paid here: a job that could never be scheduled has to
+	// be refused now, with a reason, instead of queueing forever.
+	if err := rh.rejectUnschedulableGPUs(p); err != nil {
+		return c.JSON(http.StatusUnprocessableEntity, errResponse{Message: err.Error()})
+	}
+
 	var params runRequestBody
 	err = c.Bind(&params)
 	if err != nil {
@@ -303,8 +340,13 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 	// Create job (reserves resources for sync docker/subprocess jobs)
 	err = j.Create()
 	if err != nil {
-		if err.Error() == "resources unavailable" {
-			// Only sync jobs can fail with this error
+		// Only sync jobs can fail with these errors
+		switch {
+		case errors.Is(err, jobs.ErrGPUsUnavailable):
+			return c.JSON(http.StatusServiceUnavailable, errResponse{
+				Message: "All GPUs are currently allocated. A GPU is held for a job's entire run, so this may not clear soon; use async-execute mode (if available for this process) to wait in the queue instead.",
+			})
+		case errors.Is(err, jobs.ErrResourcesUnavailable):
 			return c.JSON(http.StatusServiceUnavailable, errResponse{
 				Message: "Server resources are backlogged for local job execution. Use async-execute mode (if available for this process) or retry later.",
 			})
