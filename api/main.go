@@ -313,6 +313,8 @@ func main() {
 	e.GET("/", rh.LandingPage)
 	e.GET("/swagger/*", echoSwagger.WrapHandler)
 	e.GET("/conformance", rh.Conformance)
+	e.GET("/schemas/process", rh.ProcessSchemaPage)
+	e.GET("/schemas/process.json", rh.ProcessSchemaJSON)
 
 	// Processes
 	e.GET("/processes", rh.ProcessListHandler)
