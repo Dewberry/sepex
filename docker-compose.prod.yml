@@ -11,6 +11,18 @@ services:
       - ./api/plugins:/app/plugins
       - ./.data/api:/.data
       - /var/run/docker.sock:/var/run/docker.sock
+    # GPU scheduling: the API launches job containers as siblings on the host
+    # daemon, so those can be given GPUs while this container cannot see any.
+    # Uncomment to let the API enumerate host GPUs at startup. Visibility is not
+    # allocation, the API runs no GPU work itself. Without this, set
+    # SKIP_GPU_VERIFICATION=true and MAX_LOCAL_GPUS explicitly. See GPU_GUIDE.md.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
     networks:
       - sepex_net
     depends_on:

@@ -20,6 +20,12 @@ build:
 up: network
     docker compose up -d
 
+# Start the stack with the e2e resource limits pinned, so scheduling tests do
+# not depend on how many cores the host happens to have. E2E_GPUS sets how many
+# GPUs the suite may use (default 0).
+_up-e2e: network
+    docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d
+
 # Stop the stack
 down:
     docker compose down
@@ -34,10 +40,20 @@ wipe: down
     -docker run --rm -v {{ justfile_directory() }}/.data/:/data alpine rm -rf /data/minio
     -docker run --rm -v {{ justfile_directory() }}/.data/:/data alpine rm -rf /data/api
 
-# Run the e2e suite against the local compose stack; leaves the stack up
-test-e2e: build-plugins build up
+# Without `gpus=1` the GPU tests skip themselves. GH machine doesn't have a GPU, so it skips them.
+# Run the e2e suite including the GPU-only tests on machines with a GPU; leaves the stack up.
+test-e2e-gpu: wipe build-plugins build _up-e2e-gpu
     @just _wait-for-api
-    docker run --rm --network host -v "{{ justfile_directory() }}/tests/e2e:/etc/newman" postman/newman:5.3.1-alpine run tests.postman_collection.json --env-var "url=localhost:5050" --reporters cli --bail --color on
+    docker run --rm --network host -v "{{ justfile_directory() }}/tests/e2e:/etc/newman" postman/newman:6.1.3-alpine run tests.postman_collection.json --env-var "url=localhost:5050" --env-var "gpus=1" --reporters cli --bail --color on
+
+# Run the e2e suite against the local compose stack; leaves the stack up
+test-e2e: wipe build-plugins build _up-e2e
+    @just _wait-for-api
+    docker run --rm --network host -v "{{ justfile_directory() }}/tests/e2e:/etc/newman" postman/newman:6.1.3-alpine run tests.postman_collection.json --env-var "url=localhost:5050" --reporters cli --bail --color on
+
+# Same as _up-e2e but claims one GPU. Startup fails loudly if the host has none.
+_up-e2e-gpu: network
+    E2E_GPUS=1 docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d
 
 # Block until the stack answers on :5050, dumping logs if it never does
 _wait-for-api:

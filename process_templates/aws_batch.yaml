@@ -37,6 +37,7 @@ command:
 config:
   # max resources the container can use
   # not implemented for `aws-batch` job, should be defined in Batch job definition
+  # this includes GPUs, which come from the job definition's resourceRequirements
   # maxResources:
   # env variable keys that need to be passed to container, e.g. AEPGRID_AWS_ACCESS_KEY_ID etc
   # could be defined here or in Batch job definition or both

@@ -29,11 +29,14 @@ command:
 config:
   # max resources this subprocess is anticipated to use
   # the resource limitation is not yet implemented for `subprocess` host
+  # cpus and memory are advisory, they inform scheduling but are not enforced
   maxResources:
     # cpus in fraction for example, 0.5 would mean use 0.5 CPUs
     cpus: 0.1
     # memory in megabytes
     memory: 1024
+    # `gpus` is not supported for `subprocess`, jobs declaring it are rejected
+    # at submission, use `docker` for GPU work
   # env variable keys that need to be passed to container e.g. CRFEATERASTERRAIN_AWS_ACCESS_KEY_ID etc
   # they would be passed to the container with prefix CRFEATERASTERRAIN_ removed
   envVars:

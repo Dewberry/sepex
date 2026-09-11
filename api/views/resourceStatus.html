@@ -26,6 +26,25 @@
         </div>
     </div>
 
+    <div class="resource-section">
+        {{if eq .resources.MaxGPUs 0}}
+        <div class="resource-label-secondary">No GPUs are configured for this instance.</div>
+        {{else}}
+        <div class="resource-label">GPUs ({{.resources.UsedGPUs}} / {{.resources.MaxGPUs}} in use)</div>
+        <div class="gpu-grid">
+            {{range .resources.GPUs}}
+            {{if .JobID}}
+            <a class="gpu-device gpu-device-busy" href="/jobs/{{.JobID}}"
+                title="GPU {{.Index}} &#10;in use by job {{.JobID}}{{if .UUID}}&#10;{{.UUID}}{{end}}">{{.Index}}</a>
+            {{else}}
+            <div class="gpu-device gpu-device-free"
+                title="GPU {{.Index}} &#10;free{{if .UUID}}&#10;{{.UUID}}{{end}}">{{.Index}}</div>
+            {{end}}
+            {{end}}
+        </div>
+        {{end}}
+    </div>
+
     <div class="resource-legend">
         <div class="legend-item">
             <div class="legend-box legend-used"></div>
@@ -50,6 +69,19 @@
         <div class="resource-label-secondary">Queued Memory: {{.resources.QueuedMemory}} MB ({{printf "%.1f" .resources.QueuedMemPct}}% of capacity)</div>
         <div class="bar-queued-stack" id="mem-queued-stack" data-pct="{{printf "%.1f" .resources.QueuedMemPct}}"></div>
     </div>
+
+    {{if gt .resources.MaxGPUs 0}}
+    <div class="resource-section">
+        <div class="resource-label-secondary">Queued GPUs: {{.resources.QueuedGPUs}}</div>
+        {{if .resources.QueuedGPUSlots}}
+        <div class="gpu-grid gpu-grid-queued">
+            {{range .resources.QueuedGPUSlots}}
+            <div class="gpu-queued-slot" title="A queued job is waiting for a GPU"></div>
+            {{end}}
+        </div>
+        {{end}}
+    </div>
+    {{end}}
 
     <script>
         window.addEventListener('load', function() {

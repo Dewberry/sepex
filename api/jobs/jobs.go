@@ -3,6 +3,7 @@ package jobs
 import (
 	"app/utils"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -13,9 +14,25 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var (
+	// ErrResourcesUnavailable is returned when a sync job cannot reserve CPU
+	// or memory. These free up as jobs finish, so retrying later is reasonable
+	// advice.
+	ErrResourcesUnavailable = errors.New("resources unavailable")
+
+	// ErrGPUsUnavailable is returned when a sync job cannot reserve GPUs.
+	// It is distinct from ErrResourcesUnavailable because the advice differs:
+	// a GPU is held exclusively for a job's entire run, so the wait is
+	// unbounded and "retry shortly" is misleading.
+	ErrGPUsUnavailable = errors.New("gpus unavailable")
+)
+
+// Resources is what a job needs from the host. Field order must stay identical
+// to processes.Resources, which handlers converts from directly.
 type Resources struct {
 	CPUs   float32
 	Memory int
+	GPUs   int
 }
 
 // Job refers to any process that has been created through
@@ -70,6 +87,12 @@ type Job interface {
 
 	// GetResources returns the CPU and memory resources for this job
 	GetResources() Resources
+
+	// AssignGPUs records the devices the pool allocated to this job. The job
+	// must hand back exactly these on release, so they are stored rather than
+	// recomputed. Callers that reserve on a job's behalf (QueueWorker) must
+	// call this before Run().
+	AssignGPUs(devices []GPUDevice)
 
 	// Run executes the job. Called by QueueWorker in a goroutine for Pending Jobs.
 	// Called by handler for sync jobs

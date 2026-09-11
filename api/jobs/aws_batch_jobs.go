@@ -200,6 +200,10 @@ func (j *AWSBatchJob) GetResources() Resources {
 	return j.Resources
 }
 
+// AssignGPUs is a no-op: AWS Batch allocates its own resources, GPUs included,
+// from the job definition. These jobs never enter the local resource pool.
+func (j *AWSBatchJob) AssignGPUs([]GPUDevice) {}
+
 // Run is a no-op for AWS Batch jobs since they auto-start in Create()
 func (j *AWSBatchJob) Run() {
 	// AWS Batch jobs are submitted and start running automatically via the batch service

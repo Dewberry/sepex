@@ -75,9 +75,18 @@ type Outputs struct {
 	InputID     string `yaml:"inputId" json:"inputId,omitempty"`
 }
 
+// Resources declares what a process needs from the host it runs on.
+//
+// CPUs and Memory are advisory: they inform how many jobs the queue runs at
+// once, and nothing enforces them at launch. GPUs are enforced, because a GPU
+// cannot be subdivided and two jobs sharing one fail rather than slow down.
+//
+// Field order must stay identical to jobs.Resources, which handlers converts
+// to directly.
 type Resources struct {
 	CPUs   float32 `yaml:"cpus" json:"cpus,omitempty"`
 	Memory int     `yaml:"memory" json:"memory,omitempty"`
+	GPUs   int     `yaml:"gpus" json:"gpus,omitempty"`
 }
 
 type Host struct {
@@ -308,8 +317,8 @@ func MarshallProcess(f string) (Process, error) {
 }
 
 // Load all processes from yml files in the given directory and subdirectories.
-// maxCPUs and maxMemory are resource limits for validating docker/subprocess processes.
-func LoadProcesses(dir string, maxCPUs float32, maxMemory int) (ProcessList, error) {
+// maxCPUs, maxMemory, and maxGPUs are resource limits for validating docker/subprocess processes.
+func LoadProcesses(dir string, maxCPUs float32, maxMemory int, maxGPUs int) (ProcessList, error) {
 	var pl ProcessList
 
 	ymls, err := filepath.Glob(fmt.Sprintf("%s/*/*.yml", dir))
@@ -329,7 +338,7 @@ func LoadProcesses(dir string, maxCPUs float32, maxMemory int) (ProcessList, err
 			log.Errorf("could not register process %s Error: %v", filepath.Base(y), err)
 			continue
 		}
-		err = p.Validate(maxCPUs, maxMemory)
+		err = p.Validate(maxCPUs, maxMemory, maxGPUs)
 		if err != nil {
 			log.Errorf("could not register process %s Error: %v", filepath.Base(y), err.Error())
 			continue
@@ -349,9 +358,13 @@ func LoadProcesses(dir string, maxCPUs float32, maxMemory int) (ProcessList, err
 }
 
 // Validate checks if the Process has all required fields properly set.
-// maxCPUs and maxMemory are the resource limits for local job scheduling.
-// Pass 0 for both to skip resource limit validation.
-func (p *Process) Validate(maxCPUs float32, maxMemory int) error {
+// maxCPUs, maxMemory, and maxGPUs are the resource limits for local job
+// scheduling. Pass 0 for maxCPUs or maxMemory to skip validating them.
+//
+// maxGPUs has no such escape: 0 means the host genuinely has no GPUs, which is
+// the common case, so it is always meaningful. It only ever produces a warning
+// regardless, never a validation failure.
+func (p *Process) Validate(maxCPUs float32, maxMemory int, maxGPUs int) error {
 	if p.Info.ID == "" {
 		return errors.New("process ID is required")
 	}
@@ -433,6 +446,25 @@ func (p *Process) Validate(maxCPUs float32, maxMemory int) error {
 		}
 		if maxMemory > 0 && p.Config.Resources.Memory > maxMemory {
 			return fmt.Errorf("process requires %dMB memory but max allowed is %dMB", p.Config.Resources.Memory, maxMemory)
+		}
+		if p.Config.Resources.GPUs < 0 {
+			return fmt.Errorf("process requires %d GPUs; the value must not be negative", p.Config.Resources.GPUs)
+		}
+
+		// GPU availability is deliberately not validated here. The same
+		// yaml is meant to load on GPU and non-GPU hosts alike, so a host
+		// fact must not drop a process from it -- the same reasoning that
+		// leaves aws-batch job definitions unresolved. Jobs that can never run
+		// are rejected at submission instead, where the message can be
+		// actionable.
+		if p.Config.Resources.GPUs > maxGPUs {
+			log.Warnf("process %s requires %d GPU(s) but only %d are available on this host; its jobs will be rejected at submission",
+				p.Info.ID, p.Config.Resources.GPUs, maxGPUs)
+		}
+
+		if p.Host.Type == "subprocess" && p.Config.Resources.GPUs > 0 {
+			log.Warnf("process %s declares %d GPU(s), but GPU allocation is not supported for subprocess processes; its jobs will be rejected at submission",
+				p.Info.ID, p.Config.Resources.GPUs)
 		}
 	}
 
