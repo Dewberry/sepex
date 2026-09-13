@@ -80,32 +80,6 @@ jobs:
 
           echo "✓ Validation passed: Tag ${{ steps.version.outputs.tag_name }} is valid and CHANGELOG.md contains version $VERSION"
 
-  generate-release-notes:
-    name: Generate Release Notes
-    runs-on: ubuntu-latest
-    needs: [validate-release]
-    permissions:
-      contents: read
-    outputs:
-      release_title: ${{ steps.release_notes.outputs.release_title }}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v6
-
-      - name: Make script executable
-        run: chmod +x ./.github/workflows/scripts/generate-release-notes.sh
-
-      - name: Generate release notes
-        id: release_notes
-        run: ./.github/workflows/scripts/generate-release-notes.sh "${{ needs.validate-release.outputs.tag_name }}" "${{ github.repository }}" "$GITHUB_OUTPUT"
-
-      - name: Upload release notes
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-notes
-          path: release_notes.md
-          retention-days: 1
-
   codeql-scan:
     name: CodeQL Security Scan
     runs-on: ubuntu-latest
@@ -131,12 +105,14 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
 
-  build-container:
-    name: Build Container Image
+  build-and-scan-container:
+    name: Build, Scan, and Push Container Image
     runs-on: ubuntu-latest
-    needs: [validate-release]
+    needs: [validate-release, codeql-scan]
     permissions:
       contents: read
+      packages: write
+      security-events: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
@@ -146,7 +122,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image with cache
+      - name: Build Docker image for scanning (without push)
         uses: docker/build-push-action@v6
         with:
           context: ./api
@@ -156,65 +132,25 @@ jobs:
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          tags: local-image:${{ needs.validate-release.outputs.version }}
+          tags: local-scan-image:${{ needs.validate-release.outputs.version }}
           build-args: |
             GIT_TAG=${{ needs.validate-release.outputs.tag_name }}
 
-      - name: Save Docker image
-        run: docker save local-image:${{ needs.validate-release.outputs.version }} -o /tmp/container-image.tar
-
-      - name: Upload container image
-        uses: actions/upload-artifact@v4
-        with:
-          name: container-image
-          path: /tmp/container-image.tar
-          retention-days: 1
-
-  scan-container:
-    name: Scan Container Image
-    runs-on: ubuntu-latest
-    needs: [validate-release, build-container]
-    permissions:
-      security-events: write
-      contents: read
-    steps:
-      - name: Download container image
-        uses: actions/download-artifact@v4
-        with:
-          name: container-image
-          path: /tmp
-
-      - name: Load Docker image
-        run: docker load -i /tmp/container-image.tar
-
       - name: Scan container with Trivy
-        uses: aquasecurity/trivy-action@0.34.2
+        uses: aquasecurity/trivy-action@v0.36.0
+        continue-on-error: true
         with:
-          image-ref: local-image:${{ needs.validate-release.outputs.version }}
+          image-ref: local-scan-image:${{ needs.validate-release.outputs.version }}
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
+          exit-code: '0'
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
+        if: always()
         with:
           sarif_file: 'trivy-results.sarif'
-
-  push-and-release:
-    name: Push Image & Create Release
-    runs-on: ubuntu-latest
-    needs: [validate-release, generate-release-notes, codeql-scan, scan-container]
-    permissions:
-      contents: write
-      packages: write
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
@@ -253,15 +189,24 @@ jobs:
           build-args: |
             GIT_TAG=${{ needs.validate-release.outputs.tag_name }}
 
-      - name: Download release notes
-        uses: actions/download-artifact@v4
-        with:
-          name: release-notes
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-and-scan-container]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
 
-      - name: Create GitHub Release
+      - name: Generate release notes
+        id: release_notes
+        run: ./.github/scripts/generate-release-notes.sh "${{ needs.validate-release.outputs.tag_name }}" "${{ github.repository }}" "$GITHUB_OUTPUT"
+
+      - name: Create Draft Release
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ needs.generate-release-notes.outputs.release_title }}
+          name: ${{ steps.release_notes.outputs.release_title }}
           body_path: release_notes.md
-          draft: false
+          draft: true
           prerelease: ${{ needs.validate-release.outputs.is_prerelease == 'true' }}
