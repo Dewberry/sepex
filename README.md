@@ -150,6 +150,27 @@ job definition.
 See [GPU_GUIDE.md](GPU_GUIDE.md) for declaring GPUs, configuring the server,
 and troubleshooting.
 
+### Job Groups
+
+Work that is naturally many independent jobs can be submitted in one request and
+tracked as one unit:
+
+```
+POST /processes/{processID}/group-execution
+```
+
+The response carries one group ID. `GET /job-groups/{groupID}` reports a
+combined status and a count of members by status, and
+`DELETE /job-groups/{groupID}` dismisses every member that has not finished.
+
+A group is only a submission and tracking mechanism. Every member is an ordinary
+job with its own status, logs, results and metadata at `/jobs/{jobID}`, and it
+runs exactly as it would have if submitted on its own. A group has no logs,
+results or metadata of its own. The groups are not meant to orchestrate workflows or make jobs depend on each other, and changes nothing about how any member is queued or executed.
+
+See [GROUPS_GUIDE.md](GROUPS_GUIDE.md) for submitting, tracking, dismissing, and
+what happens when a submission cannot be completed.
+
 ### Logs
 
 ![](imgs/readme/logs.png)

@@ -78,6 +78,25 @@ How we ended up recording what each job ran, and what we tried first.
 
 The `digestSource` values are documented for users in the Metadata section of README.md and declared as a term in context.jsonld. We have to keep those and the constants in api/jobs/metadata.go in sync.
 
+## Job Groups
+
+They are a submission and tracking mechanism only: every member is an
+ordinary job.
+
+**Design decisions:**
+
+1. A group is a vendor extension at its own path, the shape of its endpoints (`/processes/{processID}/group-execution`, and then served at `/job-groups/{groupID}`) is kept same as an OGC job, which is created at an execution endpoint and then lives under `/jobs`.
+1. The jobs table is not altered. Groups live in two new tables. An existing database needs no migration. That matters most for SQLite, which has no `ADD COLUMN IF NOT EXISTS` and therefore no backfill path in that backend.
+1. Members are keyed by position rather than by job, and `job_id` is nullable. A member whose job could not be created keeps its place and carries the reason, so a client can see which entries of its request to resubmit instead of inferring them from gaps.
+1. Submission runs in the background and the request returns as soon as the group is recorded. This is because submissions will take time and we can not let callers wait that much.
+1. Once submission starts, a member that fails does not stop the ones after it, because killing jobs that are running correctly throws away real work. Submission gives up only after 10 consecutive failures assuming that backend is broken.
+1. SEPEX never dismisses a group's members on its own; only DELETE does. A partially submitted group leaves its members running and lets the client decide whether the partial result is worth keeping.
+1. `submitted` is a nullable timestamp rather than a state enum. It answers the only question that cannot be derived from the members: whether more of them are still coming. How complete a group is, comes from counting the members that exist against `requested`.
+1. Members are dismissed in reverse submission order. This makes sure that we do not free up queue before every other job waiting in this group is already dismissed, else it has potential to be picked up.
+1. Every member carries a `group:{groupID}` tag, and the prefix is reserved at submission on both endpoints. The tag is what makes a group's jobs findable through the ordinary `/jobs` filter; reserving it stops an unrelated job claiming membership. A group ID is a UUID, so unlike tags generally this one is immune to prefix matching and contains no LIKE wildcard.
+1. The group status endpoint applies the rule of the job list rather than of a single job, because it returns many jobs at once: at `AUTH_LEVEL=2` a non-admin sees only the groups they submitted.
+1. Group writes on the Database interface are exported while job writes are not. A job writes its own record from inside the jobs package, but a group is submitted from the handlers package, where the process catalog it needs lives.
+
 ## Release/Versioning/Changelog
 
 The project uses an automated release workflow triggered by semver tags (e.g., `v1.0.0`, `v1.0.0-beta`). The workflow validates prerequisites, runs security scans, builds multi-platform container images, and creates GitHub releases with auto-generated release notes.

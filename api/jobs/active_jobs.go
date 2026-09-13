@@ -10,6 +10,18 @@ type ActiveJobs struct {
 	mu   sync.Mutex
 }
 
+// Get returns the job with this ID while it is still active.
+//
+// Callers must use this rather than indexing Jobs directly because
+// Add and Remove write the map from other goroutines.
+func (ac *ActiveJobs) Get(jobID string) (*Job, bool) {
+	ac.mu.Lock()
+	defer ac.mu.Unlock()
+
+	j, ok := ac.Jobs[jobID]
+	return j, ok
+}
+
 func (ac *ActiveJobs) Add(j *Job) {
 	ac.mu.Lock()
 	defer ac.mu.Unlock()
