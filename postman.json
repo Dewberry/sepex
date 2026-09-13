@@ -532,6 +532,155 @@
       ]
     },
     {
+      "name": "job-groups",
+      "description": "Submit many executions of one process in a single request and track them as one unit. Every member is an ordinary job with its own status, logs, results and metadata at /jobs/{jobID}; a group has none of its own. See GROUPS_GUIDE.md.",
+      "item": [
+        {
+          "name": "group-execution",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var resp = pm.response.json()\r",
+                  "pm.collectionVariables.set(\"groupID\", resp[\"groupID\"])"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tags\": [\"tile:122\"],\n    \"jobs\": [\n        {\n            \"inputs\": {\n                \"crs\": \"4326\",\n                \"points\": [[-76.491824, 37.271065]],\n                \"tile\": \"122\",\n                \"epoch\": \"2020\"\n            },\n            \"tags\": [\"site:a\"]\n        },\n        {\n            \"inputs\": {\n                \"crs\": \"4326\",\n                \"points\": [[-76.492411, 37.271803]],\n                \"tile\": \"122\",\n                \"epoch\": \"2020\"\n            },\n            \"tags\": [\"site:b\"]\n        }\n    ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/processes/:processID/group-execution",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "processes",
+                ":processID",
+                "group-execution"
+              ],
+              "variable": [
+                {
+                  "key": "processID",
+                  "value": "dfc"
+                }
+              ]
+            },
+            "description": "Submits every entry of `jobs` as its own job of the same process. The process must support `async-execute`, since groups are always asynchronous.\n\nThe whole request is validated before anything is created: a bad entry, a malformed tag, or more jobs than `MAX_GROUP_SIZE` (default 1000) fails with a 4xx and creates nothing. Group `tags` are written onto every member alongside that member's own. Tags starting with `group:` are reserved.\n\nReturns `201` with the `groupID` as soon as the group is recorded. Members are created in the background, so watch them appear with job-group-status."
+          },
+          "response": []
+        },
+        {
+          "name": "job-group-status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/job-groups/:groupID",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "job-groups",
+                ":groupID"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "failed,notCreated",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": true
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "f",
+                  "value": "json",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "groupID",
+                  "value": "{{groupID}}"
+                }
+              ]
+            },
+            "description": "Reports the group's combined status, a `summary` counting every member by status, and one page of `jobs` in submission order.\n\n- `status` filters the listed members, comma separated. It takes any job status, plus `notCreated` for entries that never became jobs. It never changes `summary`.\n- `limit` (default 20, max 100; larger values are clamped) and `offset` page through the members.\n- `f` selects `json` or `html`."
+          },
+          "response": []
+        },
+        {
+          "name": "jobs-filter-by-group",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/jobs?tags=group:{{groupID}}",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "jobs"
+              ],
+              "query": [
+                {
+                  "key": "tags",
+                  "value": "group:{{groupID}}"
+                }
+              ]
+            },
+            "description": "Every member is tagged `group:{groupID}`, so the ordinary job list finds a group's jobs."
+          },
+          "response": []
+        },
+        {
+          "name": "job-group-dismiss",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/job-groups/:groupID",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "job-groups",
+                ":groupID"
+              ],
+              "variable": [
+                {
+                  "key": "groupID",
+                  "value": "{{groupID}}"
+                }
+              ]
+            },
+            "description": "Stops any submission still in progress, then dismisses every member that is still accepted or running. Finished members keep their logs and results. Safe to repeat: another call retries any member that could not be dismissed."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "callbacks",
       "item": [
         {
@@ -1138,6 +1287,10 @@
   "variable": [
     {
       "key": "jobID",
+      "value": ""
+    },
+    {
+      "key": "groupID",
       "value": ""
     }
   ]
