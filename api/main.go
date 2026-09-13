@@ -291,6 +291,15 @@ func main() {
 		log.Fatalf("job recovery failed: %v", err)
 	}
 
+	// A group whose submission was still running when the server stopped would
+	// otherwise wait forever for members that are never coming. Unlike job
+	// recovery this is not fatal: a group carries no state of its own that
+	// anything else depends on, so failing to close one out is worth reporting
+	// but not worth refusing to start over.
+	if err := rh.FinalizeInterruptedGroups(); err != nil {
+		log.Errorf("could not close out interrupted job group submissions: %v", err)
+	}
+
 	// Goroutines
 	go rh.StatusUpdateRoutine()
 	go rh.JobCompletionRoutine()
@@ -307,6 +316,9 @@ func main() {
 		AllowCredentials: true,
 		AllowOrigins:     []string{"*"},
 	}))
+	// This middleware rejects requests with multi-segment parameters. Without this middleware, a request like
+	// /processes/abc/def would be accepted and the processID would be set to "abc/def", which is not valid.
+	e.Use(handlers.RejectMultiSegmentParams)
 	e.Renderer = &rh.T
 
 	// Create a group for all routes that need to be protected when AUTH_LEVEL = protected
@@ -327,6 +339,7 @@ func main() {
 	pg.DELETE("/processes/:processID", rh.DeleteProcessHandler)
 
 	pg.POST("/processes/:processID/execution", rh.Execution)
+	pg.POST("/processes/:processID/group-execution", rh.GroupExecutionHandler)
 
 	// TODO
 	// pg.Post("processes/:processID/new, rh.RegisterNewProcess)
@@ -339,6 +352,10 @@ func main() {
 	e.GET("/jobs/:jobID/logs", rh.JobLogsHandler)
 	e.GET("/jobs/:jobID/metadata", rh.JobMetaDataHandler)
 	pg.DELETE("/jobs/:jobID", rh.JobDismissHandler)
+
+	// Job Groups
+	e.GET("/job-groups/:groupID", rh.JobGroupStatusHandler)
+	pg.DELETE("/job-groups/:groupID", rh.JobGroupDismissHandler)
 
 	// Callbacks
 	pg.PUT("/jobs/:jobID/status", rh.JobStatusUpdateHandler)
@@ -379,6 +396,11 @@ func main() {
 
 	// Shutdown the server
 	// By default, Docker provides a grace period of 10 seconds with the docker stop command.
+
+	// Stop creating group members before stopping the queue, so that a
+	// submission in flight cannot enqueue a job nothing will ever start. Any
+	// group left unfinished is closed out at the next startup.
+	rh.GroupSubmitter.Stop(5 * time.Second)
 
 	// Stop QueueWorker from starting new jobs
 	rh.QueueWorker.Stop()

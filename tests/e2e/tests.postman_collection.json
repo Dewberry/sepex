@@ -3926,6 +3926,1104 @@
     }
    ],
    "description": "Tests for the local scheduler resource management"
+  },
+  {
+   "name": "job-groups",
+   "item": [
+    {
+     "name": "add-group-process",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "// A group is always asynchronous, so the fixture has to offer",
+         "// async-execute. It sleeps so its members are still running when the",
+         "// group is dismissed.",
+         "pm.test('Group fixture registers', function () {",
+         "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"info\": {\n        \"version\": \"1.0.0\",\n        \"id\": \"groupTest\",\n        \"title\": \"groupTest\",\n        \"description\": \"Job group e2e fixture\",\n        \"jobControlOptions\": [\n            \"async-execute\"\n        ],\n        \"outputTransmission\": [\n            \"value\"\n        ]\n    },\n    \"host\": {\n        \"type\": \"docker\",\n        \"image\": \"public.ecr.aws/docker/library/alpine:3.20\"\n    },\n    \"command\": [\n        \"sleep\",\n        \"30\"\n    ],\n    \"config\": {\n        \"maxResources\": {\n            \"cpus\": 0.1,\n            \"memory\": 64\n        }\n    },\n    \"inputs\": [],\n    \"outputs\": []\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{url}}/processes/:processID",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "processes",
+        ":processID"
+       ],
+       "variable": [
+        {
+         "key": "processID",
+         "value": "groupTest"
+        }
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "submit-group-invalid-inputs",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "// The whole request is validated before anything is created, so a bad",
+         "// entry fails the request and leaves no group behind.",
+         "pm.test('Rejected with 400', function () { pm.response.to.have.status(400); });",
+         "",
+         "pm.test('Message names the offending entry by position', function () {",
+         "    pm.expect(pm.response.json().message).to.include('job 1');",
+         "});",
+         "",
+         "pm.test('No group was created', function () {",
+         "    pm.expect(pm.response.json()).to.not.have.property('groupID');",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"jobs\": [\n        {\n            \"inputs\": {}\n        },\n        {\n            \"inputs\": {\n                \"notAnInput\": \"x\"\n            }\n        }\n    ]\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{url}}/processes/:processID/group-execution",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "processes",
+        ":processID",
+        "group-execution"
+       ],
+       "variable": [
+        {
+         "key": "processID",
+         "value": "groupTest"
+        }
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "submit-group-reserved-tag",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "// Group membership is recorded as a tag, so a client may not write one",
+         "// or an unrelated job could claim to belong to a group.",
+         "pm.test('Rejected with 400', function () { pm.response.to.have.status(400); });",
+         "",
+         "pm.test('Message says the prefix is reserved', function () {",
+         "    pm.expect(pm.response.json().message).to.include('reserved');",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"tags\": [\n        \"group:forged\"\n    ],\n    \"jobs\": [\n        {\n            \"inputs\": {}\n        }\n    ]\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{url}}/processes/:processID/group-execution",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "processes",
+        ":processID",
+        "group-execution"
+       ],
+       "variable": [
+        {
+         "key": "processID",
+         "value": "groupTest"
+        }
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "submit-group-sync-only-process",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "// pyecho only supports sync-execute. A group is always asynchronous,",
+         "// so there is nothing to fall back to: 422 rather than 400, because",
+         "// the request is well formed and the server simply cannot serve it.",
+         "pm.test('Rejected with 422', function () { pm.response.to.have.status(422); });",
+         "",
+         "pm.test('Message explains why', function () {",
+         "    pm.expect(pm.response.json().message).to.include('async-execute');",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"jobs\": [\n        {\n            \"inputs\": {\n                \"text\": \"hello\"\n            }\n        }\n    ]\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{url}}/processes/:processID/group-execution",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "processes",
+        ":processID",
+        "group-execution"
+       ],
+       "variable": [
+        {
+         "key": "processID",
+         "value": "pyecho"
+        }
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "submit-group",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+         "",
+         "var body = pm.response.json();",
+         "pm.collectionVariables.set('groupID', body.groupID);",
+         "",
+         "pm.test('Returns a group id and what was asked for', function () {",
+         "    pm.expect(body.groupID).to.be.a('string').and.not.empty;",
+         "    pm.expect(body.requested).to.eql(3);",
+         "    pm.expect(body.status).to.eql('accepted');",
+         "    pm.expect(body.tags).to.include('e2e-group');",
+         "});",
+         "",
+         "pm.test('Points at the group', function () {",
+         "    pm.expect(pm.response.headers.get('Location')).to.include('/job-groups/');",
+         "    pm.expect(body.links).to.be.an('array').that.is.not.empty;",
+         "});",
+         "",
+         "// Members are created in the background, so the response carries none.",
+         "pm.test('No members are claimed yet', function () {",
+         "    pm.expect(body).to.not.have.property('jobs');",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"tags\": [\n        \"e2e-group\"\n    ],\n    \"jobs\": [\n        {\n            \"inputs\": {},\n            \"tags\": [\n                \"q:400\"\n            ]\n        },\n        {\n            \"inputs\": {},\n            \"tags\": [\n                \"q:550\"\n            ]\n        },\n        {\n            \"inputs\": {}\n        }\n    ]\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{url}}/processes/:processID/group-execution",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "processes",
+        ":processID",
+        "group-execution"
+       ],
+       "variable": [
+        {
+         "key": "processID",
+         "value": "groupTest"
+        }
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "group-status",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "// Members arrive in the background, so wait for them rather than",
+         "// assuming they are there. Bounded, so a stuck submission fails the",
+         "// test instead of hanging the run.",
+         "function pause(ms) { var t = Date.now(); while (Date.now() - t < ms) {} }",
+         "",
+         "var body = pm.response.json();",
+         "var tries = parseInt(pm.collectionVariables.get('groupPollTries') || '0', 10);",
+         "",
+         "if (body.jobs.length < 3 && tries < 10) {",
+         "    pm.collectionVariables.set('groupPollTries', String(tries + 1));",
+         "    pause(1000);",
+         "    postman.setNextRequest('group-status');",
+         "} else {",
+         "    pm.collectionVariables.set('groupPollTries', '0');",
+         "",
+         "    pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+         "",
+         "    pm.test('Every member asked for was created', function () {",
+         "        pm.expect(body.requested).to.eql(3);",
+         "        pm.expect(body.jobs.length).to.eql(3);",
+         "        pm.expect(body.summary.notCreated).to.eql(0);",
+         "    });",
+         "",
+         "    pm.test('Group is not finished while members are running', function () {",
+         "        pm.expect(body.status).to.be.oneOf(['accepted', 'running']);",
+         "    });",
+         "",
+         "    pm.test('Members are listed in submission order with their jobs', function () {",
+         "        body.jobs.forEach(function (m, i) {",
+         "            pm.expect(m.position).to.eql(i);",
+         "            pm.expect(m.jobID).to.be.a('string').and.not.empty;",
+         "            pm.expect(m.processID).to.eql('groupTest');",
+         "        });",
+         "    });",
+         "",
+         "    pm.test('Members carry the group tag and the group tags', function () {",
+         "        body.jobs.forEach(function (m) {",
+         "            pm.expect(m.tags).to.include('group:' + body.groupID);",
+         "            pm.expect(m.tags).to.include('e2e-group');",
+         "        });",
+         "    });",
+         "}"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{url}}/job-groups/{{groupID}}",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "job-groups",
+        "{{groupID}}"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "group-members-are-ordinary-jobs",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "// The group tag is what makes a group's jobs reachable through the",
+         "// ordinary job list. A group id is a uuid, so this tag cannot be",
+         "// confused with another group's by prefix matching.",
+         "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+         "",
+         "pm.test('The group tag finds exactly the members', function () {",
+         "    var jobs = pm.response.json().jobs;",
+         "    pm.expect(jobs.length).to.eql(3);",
+         "    jobs.forEach(function (j) {",
+         "        pm.expect(j.tags).to.include('group:' + pm.collectionVariables.get('groupID'));",
+         "        pm.expect(j.processID).to.eql('groupTest');",
+         "    });",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{url}}/jobs?tags=group:{{groupID}}",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "jobs"
+       ],
+       "query": [
+        {
+         "key": "tags",
+         "value": "group:{{groupID}}"
+        }
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "group-status-filtered",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+         "",
+         "// Every member was created, so nothing matches this filter.",
+         "pm.test('No member failed to be created', function () {",
+         "    pm.expect(pm.response.json().jobs).to.be.an('array').that.is.empty;",
+         "});",
+         "",
+         "// Filtering changes which members are listed, never the summary.",
+         "pm.test('Summary still counts every member', function () {",
+         "    var s = pm.response.json().summary;",
+         "    pm.expect(s.accepted + s.running + s.successful + s.failed + s.dismissed + s.lost).to.eql(3);",
+         "    pm.expect(pm.response.json().requested).to.eql(3);",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{url}}/job-groups/{{groupID}}?status=notCreated",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "job-groups",
+        "{{groupID}}"
+       ],
+       "query": [
+        {
+         "key": "status",
+         "value": "notCreated"
+        }
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "group-status-invalid-filter",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test('Rejected with 400', function () { pm.response.to.have.status(400); });",
+         "",
+         "pm.test('Message lists what is valid', function () {",
+         "    pm.expect(pm.response.json().message).to.include('notCreated');",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{url}}/job-groups/{{groupID}}?status=bogus",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "job-groups",
+        "{{groupID}}"
+       ],
+       "query": [
+        {
+         "key": "status",
+         "value": "bogus"
+        }
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "group-not-found",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test('Unknown group is a 404', function () { pm.response.to.have.status(404); });",
+         "",
+         "pm.test('Response has message', function () {",
+         "    pm.response.to.have.jsonBody('message');",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{url}}/job-groups/00000000-0000-0000-0000-000000000000",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "job-groups",
+        "00000000-0000-0000-0000-000000000000"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "dismiss-group",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+         "",
+         "// One call stops every member that had not finished.",
+         "pm.test('Every member was dismissed', function () {",
+         "    var body = pm.response.json();",
+         "    pm.expect(body.summary.dismissed).to.eql(3);",
+         "    pm.expect(body.status).to.eql('dismissed');",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{url}}/job-groups/{{groupID}}",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "job-groups",
+        "{{groupID}}"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "dismiss-group-again",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "// Dismissing is safe to repeat: members that have already finished are",
+         "// left exactly as they are.",
+         "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+         "",
+         "pm.test('Group is still dismissed', function () {",
+         "    var body = pm.response.json();",
+         "    pm.expect(body.status).to.eql('dismissed');",
+         "    pm.expect(body.summary.dismissed).to.eql(3);",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{url}}/job-groups/{{groupID}}",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "job-groups",
+        "{{groupID}}"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "group-status-after-dismissal",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+         "",
+         "pm.test('Group reports dismissed', function () {",
+         "    var body = pm.response.json();",
+         "    pm.expect(body.status).to.eql('dismissed');",
+         "    pm.expect(body.summary.dismissed).to.eql(3);",
+         "    pm.expect(body.updated).to.be.a('string');",
+         "});",
+         "",
+         "// Members stay ordinary jobs: dismissed is a job status like any other.",
+         "pm.test('Members report dismissed individually', function () {",
+         "    pm.response.json().jobs.forEach(function (m) {",
+         "        pm.expect(m.status).to.eql('dismissed');",
+         "    });",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{url}}/job-groups/{{groupID}}",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "job-groups",
+        "{{groupID}}"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "delete-group-process",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test('Cleanup succeeded', function () {",
+         "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{url}}/processes/:processID",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "processes",
+        ":processID"
+       ],
+       "variable": [
+        {
+         "key": "processID",
+         "value": "groupTest"
+        }
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "add-quick-group-process",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "// A fixture that finishes on its own, so a group can be watched all the",
+         "// way to successful rather than only being dismissed.",
+         "pm.test('Quick group fixture registers', function () {",
+         "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"info\": {\n        \"version\": \"1.0.0\",\n        \"id\": \"groupTestQuick\",\n        \"title\": \"groupTestQuick\",\n        \"description\": \"Job group e2e fixture that finishes immediately\",\n        \"jobControlOptions\": [\n            \"async-execute\"\n        ],\n        \"outputTransmission\": [\n            \"value\"\n        ]\n    },\n    \"host\": {\n        \"type\": \"docker\",\n        \"image\": \"public.ecr.aws/docker/library/alpine:3.20\"\n    },\n    \"command\": [\n        \"echo\",\n        \"done\"\n    ],\n    \"config\": {\n        \"maxResources\": {\n            \"cpus\": 0.1,\n            \"memory\": 64\n        }\n    },\n    \"inputs\": [],\n    \"outputs\": []\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{url}}/processes/:processID",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "processes",
+        ":processID"
+       ],
+       "variable": [
+        {
+         "key": "processID",
+         "value": "groupTestQuick"
+        }
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "submit-quick-group",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+         "",
+         "var body = pm.response.json();",
+         "pm.collectionVariables.set('quickGroupID', body.groupID);",
+         "",
+         "pm.test('Group was accepted', function () {",
+         "    pm.expect(body.requested).to.eql(3);",
+         "    pm.expect(body.status).to.eql('accepted');",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"tags\": [\n        \"e2e-group-quick\"\n    ],\n    \"jobs\": [\n        {\n            \"inputs\": {}\n        },\n        {\n            \"inputs\": {}\n        },\n        {\n            \"inputs\": {}\n        }\n    ]\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{url}}/processes/:processID/group-execution",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "processes",
+        ":processID",
+        "group-execution"
+       ],
+       "variable": [
+        {
+         "key": "processID",
+         "value": "groupTestQuick"
+        }
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "quick-group-completes",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "// Wait for the group to reach a terminal status. A group is only",
+         "// terminal once submission has finished and every member has, so this",
+         "// exercises the whole path rather than a snapshot of it.",
+         "function pause(ms) { var t = Date.now(); while (Date.now() - t < ms) {} }",
+         "",
+         "var body = pm.response.json();",
+         "var tries = parseInt(pm.collectionVariables.get('groupPollTries') || '0', 10);",
+         "var terminal = ['successful', 'failed', 'dismissed'];",
+         "",
+         "if (terminal.indexOf(body.status) === -1 && tries < 30) {",
+         "    pm.collectionVariables.set('groupPollTries', String(tries + 1));",
+         "    pause(1000);",
+         "    postman.setNextRequest('quick-group-completes');",
+         "} else {",
+         "    pm.collectionVariables.set('groupPollTries', '0');",
+         "    if (body.jobs.length > 0) {",
+         "        pm.collectionVariables.set('quickMemberJobID', body.jobs[0].jobID);",
+         "    }",
+         "",
+         "    pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+         "",
+         "    pm.test('A group whose members all succeeded is successful', function () {",
+         "        pm.expect(body.status).to.eql('successful');",
+         "    });",
+         "",
+         "    pm.test('Every member succeeded and none is unaccounted for', function () {",
+         "        pm.expect(body.summary.successful).to.eql(3);",
+         "        pm.expect(body.summary.failed).to.eql(0);",
+         "        pm.expect(body.summary.notCreated).to.eql(0);",
+         "        pm.expect(body.jobs.length).to.eql(body.requested);",
+         "    });",
+         "",
+         "    pm.test('Members report successful individually', function () {",
+         "        body.jobs.forEach(function (m) {",
+         "            pm.expect(m.status).to.eql('successful');",
+         "            pm.expect(m.updated).to.be.a('string');",
+         "        });",
+         "    });",
+         "",
+         "    // The group's own time comes from its members.",
+         "    pm.test('Group reports when its members last changed', function () {",
+         "        pm.expect(body.updated).to.be.a('string');",
+         "    });",
+         "}"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{url}}/job-groups/{{quickGroupID}}",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "job-groups",
+        "{{quickGroupID}}"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "finished-member-keeps-its-logs",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "// A member is an ordinary job: the group has no logs, but each member",
+         "// serves its own at /jobs/{jobID}/logs like any other job.",
+         "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+         "",
+         "pm.test('Member serves its own logs', function () {",
+         "    var body = pm.response.json();",
+         "    pm.expect(body).to.have.property('process_logs');",
+         "    pm.expect(body.status).to.eql('successful');",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{url}}/jobs/{{quickMemberJobID}}/logs",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "jobs",
+        "{{quickMemberJobID}}",
+        "logs"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "delete-quick-group-process",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test('Cleanup succeeded', function () {",
+         "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{url}}/processes/:processID",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "processes",
+        ":processID"
+       ],
+       "variable": [
+        {
+         "key": "processID",
+         "value": "groupTestQuick"
+        }
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "add-failing-group-process",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test('Failing fixture registers', function () {",
+         "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"info\": {\n        \"version\": \"1.0.0\",\n        \"id\": \"groupTestFail\",\n        \"title\": \"groupTestFail\",\n        \"description\": \"Job group e2e fixture whose members exit non-zero\",\n        \"jobControlOptions\": [\n            \"async-execute\"\n        ],\n        \"outputTransmission\": [\n            \"value\"\n        ]\n    },\n    \"host\": {\n        \"type\": \"docker\",\n        \"image\": \"public.ecr.aws/docker/library/alpine:3.20\"\n    },\n    \"command\": [\n        \"sh\",\n        \"-c\",\n        \"exit 1\"\n    ],\n    \"config\": {\n        \"maxResources\": {\n            \"cpus\": 0.1,\n            \"memory\": 64\n        }\n    },\n    \"inputs\": [],\n    \"outputs\": []\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{url}}/processes/:processID",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "processes",
+        ":processID"
+       ],
+       "variable": [
+        {
+         "key": "processID",
+         "value": "groupTestFail"
+        }
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "submit-failing-group",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+         "pm.collectionVariables.set('failGroupID', pm.response.json().groupID);"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "POST",
+      "header": [],
+      "body": {
+       "mode": "raw",
+       "raw": "{\n    \"jobs\": [\n        {\n            \"inputs\": {}\n        },\n        {\n            \"inputs\": {}\n        }\n    ]\n}",
+       "options": {
+        "raw": {
+         "language": "json"
+        }
+       }
+      },
+      "url": {
+       "raw": "{{url}}/processes/:processID/group-execution",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "processes",
+        ":processID",
+        "group-execution"
+       ],
+       "variable": [
+        {
+         "key": "processID",
+         "value": "groupTestFail"
+        }
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "failing-group-reports-failed",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "function pause(ms) { var t = Date.now(); while (Date.now() - t < ms) {} }",
+         "",
+         "var body = pm.response.json();",
+         "var tries = parseInt(pm.collectionVariables.get('groupPollTries') || '0', 10);",
+         "var terminal = ['successful', 'failed', 'dismissed'];",
+         "",
+         "if (terminal.indexOf(body.status) === -1 && tries < 30) {",
+         "    pm.collectionVariables.set('groupPollTries', String(tries + 1));",
+         "    pause(1000);",
+         "    postman.setNextRequest('failing-group-reports-failed');",
+         "} else {",
+         "    pm.collectionVariables.set('groupPollTries', '0');",
+         "",
+         "    pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+         "",
+         "    // A group is only as good as its worst member.",
+         "    pm.test('A group whose members failed is failed', function () {",
+         "        pm.expect(body.status).to.eql('failed');",
+         "        pm.expect(body.summary.failed).to.eql(2);",
+         "        pm.expect(body.summary.successful).to.eql(0);",
+         "    });",
+         "",
+         "    pm.test('Members were created, they simply failed', function () {",
+         "        pm.expect(body.summary.notCreated).to.eql(0);",
+         "        pm.expect(body.jobs.length).to.eql(2);",
+         "    });",
+         "}"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "GET",
+      "header": [],
+      "url": {
+       "raw": "{{url}}/job-groups/{{failGroupID}}",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "job-groups",
+        "{{failGroupID}}"
+       ]
+      }
+     },
+     "response": []
+    },
+    {
+     "name": "delete-failing-group-process",
+     "event": [
+      {
+       "listen": "test",
+       "script": {
+        "type": "text/javascript",
+        "exec": [
+         "pm.test('Cleanup succeeded', function () {",
+         "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+         "});"
+        ]
+       }
+      }
+     ],
+     "request": {
+      "method": "DELETE",
+      "header": [],
+      "url": {
+       "raw": "{{url}}/processes/:processID",
+       "host": [
+        "{{url}}"
+       ],
+       "path": [
+        "processes",
+        ":processID"
+       ],
+       "variable": [
+        {
+         "key": "processID",
+         "value": "groupTestFail"
+        }
+       ]
+      }
+     },
+     "response": []
+    }
+   ],
+   "description": "Tests for job groups: submitting many jobs as one unit, running one group to completion, failing another, and dismissing a third"
   }
  ],
  "event": [
@@ -3988,6 +5086,26 @@
   },
   {
    "key": "noTagsJobID",
+   "value": ""
+  },
+  {
+   "key": "groupID",
+   "value": ""
+  },
+  {
+   "key": "groupPollTries",
+   "value": "0"
+  },
+  {
+   "key": "quickGroupID",
+   "value": ""
+  },
+  {
+   "key": "quickMemberJobID",
+   "value": ""
+  },
+  {
+   "key": "failGroupID",
    "value": ""
   }
  ]

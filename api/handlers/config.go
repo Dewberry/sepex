@@ -57,6 +57,9 @@ type Config struct {
 	AdminRoleName   string
 	ServiceRoleName string
 
+	// MaxGroupSize caps how many jobs one job group may ask for.
+	MaxGroupSize int
+
 	// Resource limits for local job scheduling (docker/subprocess)
 	ResourceLimits *ResourceLimits
 }
@@ -81,6 +84,10 @@ type RESTHandler struct {
 	QueueWorker  *jobs.QueueWorker
 	ProcessList  *pr.ProcessList
 	Config       *Config
+
+	// GroupSubmitter creates the members of accepted job groups in the
+	// background, after the request that created the group has returned.
+	GroupSubmitter *GroupSubmitter
 }
 
 // Pretty print a JSON
@@ -90,6 +97,25 @@ func prettyPrint(v interface{}) string {
 		return ""
 	}
 	return string(b)
+}
+
+// viewFuncMap are the functions the html views may call.
+//
+// It is a function rather than an inline literal so that the test which parses
+// the views can use them too.
+func viewFuncMap() template.FuncMap {
+	return template.FuncMap{
+		"prettyPrint": prettyPrint, // to pretty print JSONs for results and metadata
+		"lower":       strings.ToLower,
+		"upper":       strings.ToUpper,
+		"lastSegment": func(s string) string {
+			parts := strings.Split(strings.TrimSuffix(s, "/"), "/")
+			if len(parts) > 0 {
+				return parts[len(parts)-1]
+			}
+			return s
+		},
+	}
 }
 
 // Initializes resources and return a new handler
@@ -128,6 +154,7 @@ func NewRESTHander(gitTag string, maxLocalCPUs string, maxLocalMemory string, ma
 			AdminRoleName:   os.Getenv("AUTH_ADMIN_ROLE"),
 			ServiceRoleName: os.Getenv("AUTH_SERVICE_ROLE"),
 			ResourceLimits:  resourceLimits,
+			MaxGroupSize:    resolveMaxGroupSize(),
 		},
 	}
 
@@ -143,21 +170,8 @@ func NewRESTHander(gitTag string, maxLocalCPUs string, maxLocalMemory string, ma
 	config.DB = db
 
 	// Read all the html templates
-	funcMap := template.FuncMap{
-		"prettyPrint":   prettyPrint, // to pretty print JSONs for results and metadata
-		"lower":         strings.ToLower,
-		"upper":         strings.ToUpper,
-		"lastSegment": func(s string) string {
-			parts := strings.Split(strings.TrimSuffix(s, "/"), "/")
-			if len(parts) > 0 {
-				return parts[len(parts)-1]
-			}
-			return s
-		},
-	}
-
 	config.T = Template{
-		templates: template.Must(template.New("").Funcs(funcMap).ParseGlob("views/*.html")),
+		templates: template.Must(template.New("").Funcs(viewFuncMap()).ParseGlob("views/*.html")),
 	}
 
 	stType, exist := os.LookupEnv("STORAGE_SERVICE")
@@ -207,6 +221,10 @@ func NewRESTHander(gitTag string, maxLocalCPUs string, maxLocalMemory string, ma
 		log.Fatal(err)
 	}
 	config.ProcessList = &processList
+
+	// Takes the handler it will submit through, which is the same value this
+	// function returns.
+	config.GroupSubmitter = NewGroupSubmitter(&config)
 
 	return &config
 }
@@ -261,6 +279,28 @@ func NewStorageService(providerType string) (*s3.S3, error) {
 	default:
 		return nil, fmt.Errorf("unsupported storage provider type")
 	}
+}
+
+// defaultMaxGroupSize is how many jobs one group may ask for when MAX_GROUP_SIZE is not set.
+const defaultMaxGroupSize = 1000
+
+// resolveMaxGroupSize reads MAX_GROUP_SIZE, falling back to the default when it
+// is absent or unusable. An unusable value is warned about and defaulted rather
+// than being fatal, because the limit only bounds the size of one request: too
+// low refuses a large group with a clear message, and nothing is over-committed
+// by getting it wrong.
+func resolveMaxGroupSize() int {
+	value, exist := os.LookupEnv("MAX_GROUP_SIZE")
+	if !exist || value == "" {
+		return defaultMaxGroupSize
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 1 {
+		log.Warnf("Invalid MAX_GROUP_SIZE value %q: must be a positive integer, using default %d", value, defaultMaxGroupSize)
+		return defaultMaxGroupSize
+	}
+	return parsed
 }
 
 // gpuVisibilityHint explains the ways a host with GPUs can still fail to detect

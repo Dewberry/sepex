@@ -157,7 +157,7 @@ func recoverDockerJobsFromRecords(
 
 		// Register in ActiveJobs
 		var j Job = job
-		activeJobs.Jobs[j.JobID()] = &j
+		activeJobs.Add(&j)
 		job.logger.Info("Job recovered after restart. Some features might be missing")
 		job.Recovered = true
 
@@ -378,7 +378,7 @@ func recoverAWSBatchJobsFromRecords(
 		}
 
 		var job Job = j
-		active.Jobs[j.JobID()] = &job
+		active.Add(&job)
 		j.logger.Info("Job recovered after restart. Some features might be missing")
 		j.Recovered = true
 		log.Infof("Recovery(aws-batch): added to ActiveJobs job=%s aws_status=%s", r.JobID, status)

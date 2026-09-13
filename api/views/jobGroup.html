@@ -1,0 +1,161 @@
+{{define "jobGroup"}}
+<!DOCTYPE html>
+
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="/public/img/favicon-32x32.png">
+  <title>Job Group · {{.GroupID}}</title>
+  <link rel="stylesheet" href="/public/css/main.css">
+</head>
+
+<body>
+  <h1>Job Group</h1>
+  <table>
+    <tr>
+      <td class="bold">Group ID</td>
+      <td>{{.GroupID}}</td>
+    </tr>
+    <tr>
+      <td class="bold">Status</td>
+      <td>
+        {{if eq .Status "successful"}}
+        <img src="/public/svgs/check-icon.svg" alt="successful" />
+        {{else if eq .Status "failed"}}
+        <img src="/public/svgs/cross-icon.svg" alt="failed" />
+        {{else if eq .Status "dismissed"}}
+        <img src="/public/svgs/delete-icon.svg" alt="dismissed" />
+        {{else if or (eq .Status "accepted") (eq .Status "running")}}
+        <img src="/public/svgs/yellow-circle-icon.svg" alt="in progress" />
+        {{end}}
+        {{.Status}}
+      </td>
+    </tr>
+    <tr>
+      <td class="bold">Requested</td>
+      <td>{{.Requested}}</td>
+    </tr>
+    <tr>
+      <td class="bold">Tags</td>
+      <td>{{range .Tags}}<span class="tag">{{.}}</span> {{end}}</td>
+    </tr>
+    <tr>
+      <td class="bold">Submitter</td>
+      <td>{{.Submitter}}</td>
+    </tr>
+    <tr>
+      <td class="bold">Created</td>
+      <td>{{.Created.Format "2006-01-02 15:04:05 MST"}}</td>
+    </tr>
+    {{if .Updated}}
+    <tr>
+      <td class="bold">Last Updated</td>
+      <td>{{.Updated.Format "2006-01-02 15:04:05 MST"}}</td>
+    </tr>
+    {{end}}
+    {{if .Message}}
+    <tr>
+      <td class="bold">Message</td>
+      <td>{{.Message}}</td>
+    </tr>
+    {{end}}
+  </table>
+
+  <h2>Members by status</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Accepted</th>
+        <th>Running</th>
+        <th>Successful</th>
+        <th>Failed</th>
+        <th>Dismissed</th>
+        <th>Lost</th>
+        <th>Not created</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>{{.Summary.Accepted}}</td>
+        <td>{{.Summary.Running}}</td>
+        <td>{{.Summary.Successful}}</td>
+        <td>{{.Summary.Failed}}</td>
+        <td>{{.Summary.Dismissed}}</td>
+        <td>{{.Summary.Lost}}</td>
+        <td>{{.Summary.NotCreated}}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Members</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Position</th>
+        <th>Logs (JobID)</th>
+        <th>Status</th>
+        <th>ProcessID</th>
+        <th>Tags</th>
+        <th>Updated</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Jobs}}
+      <tr>
+        <td>{{.Position}}</td>
+        <td>
+          {{if .JobID}}
+          <a href="/jobs/{{.JobID}}/logs" target="_blank">{{.JobID}}</a>
+          {{else}}
+          &mdash;
+          {{end}}
+        </td>
+        <td>
+          {{if .JobID}}
+          {{if eq .Status "successful"}}
+          <img src="/public/svgs/check-icon.svg" alt="successful" />
+          {{else if eq .Status "failed"}}
+          <img src="/public/svgs/cross-icon.svg" alt="failed" />
+          {{else if eq .Status "dismissed"}}
+          <img src="/public/svgs/delete-icon.svg" alt="dismissed" />
+          {{else if or (eq .Status "accepted") (eq .Status "running")}}
+          <img src="/public/svgs/yellow-circle-icon.svg" alt="in progress" />
+          {{else if eq .Status "lost"}}
+          <img src="/public/svgs/lost-icon.svg" alt="lost" />
+          {{end}}
+          <a href="/jobs/{{.JobID}}" target="_blank">
+            {{.Status}}
+          </a>
+          {{else}}
+          <img src="/public/svgs/cross-icon.svg" alt="not created" />
+          not created{{if .Error}}: {{.Error}}{{end}}
+          {{end}}
+        </td>
+        <td>
+          {{if .ProcessID}}
+          <a href="/processes/{{.ProcessID}}" target="_blank">{{.ProcessID}}</a>
+          {{end}}
+        </td>
+        <td>{{range .Tags}}<span class="tag">{{.}}</span> {{end}}</td>
+        <td>{{if .LastUpdate}}{{.LastUpdate.Format "2006-01-02 15:04:05 MST"}}{{end}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  <br>
+  <div class="pagination">
+    {{range .Links}}
+    {{if eq .Title "prev"}}
+    <a href="{{.Href}}" class="prev-link"> &lt; Prev </a>
+    {{end}}
+    {{if eq .Title "next"}}
+    <a href="{{.Href}}" class="next-link"> Next &gt; </a>
+    {{end}}
+    {{end}}
+  </div>
+  {{ template "tagScripts.html" }}
+</body>
+
+</html>
+{{end}}

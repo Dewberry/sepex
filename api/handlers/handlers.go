@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -82,6 +83,48 @@ type link struct {
 // string if the code is unknown.
 func (er errResponse) GetHTTPStatusText() string {
 	return http.StatusText(er.HTTPStatus)
+}
+
+// RejectMultiSegmentParams answers a request whose path parameter swallowed
+// more than one segment of the path as what it is: a path that matched nothing.
+//
+// Echo lets a path parameter that is the last piece of a route match the whole
+// remaining path, slashes included -- "when param node does not have any
+// children then param node should act similarly to any node". So a route like
+// /job-groups/:groupID, with nothing registered beneath it, also matches
+// /job-groups/{id}/results and binds "{id}/results" as the group id. The
+// handler would then answer for a resource nobody asked for, and report it as
+// missing, which reads as though the real one did not exist.
+//
+// This is checked once for every route rather than defended against route by
+// route. A route is otherwise safe only for as long as it happens to have
+// children: /jobs/:jobID is fine today because /jobs/:jobID/logs and its
+// siblings exist, and would quietly start behaving this way if they were ever
+// removed.
+//
+// The wildcard parameter of an any-route is exempt, since holding the rest of
+// the path is precisely its job.
+func RejectMultiSegmentParams(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		values := c.ParamValues()
+
+		for i, name := range c.ParamNames() {
+			if name == "*" || i >= len(values) {
+				continue
+			}
+			// Compare on the decoded value: the router matches against RawPath, so an
+			// encoded slash reaches here intact and only becomes a separator once
+			// something downstream unescapes it.
+			raw, err := url.PathUnescape(values[i])
+			if err != nil || strings.Contains(raw, "/") {
+				// Echo's own not found error, so that these are indistinguishable
+				// from any other path that does not exist.
+				return echo.ErrNotFound
+			}
+		}
+
+		return next(c)
+	}
 }
 
 var validFormats = []string{"", "json", "html"}
@@ -181,6 +224,128 @@ func (rh *RESTHandler) Conformance(c echo.Context) error {
 	return prepareResponse(c, http.StatusOK, "conformance", output)
 }
 
+// rejectReservedTags refuses tags that SEPEX writes itself.
+func rejectReservedTags(tags []string) error {
+	for _, t := range tags {
+		if strings.HasPrefix(strings.ToLower(t), jobs.GroupTagPrefix) {
+			return fmt.Errorf("tag %q is reserved: the %q prefix is written by the server to record job group membership", t, jobs.GroupTagPrefix)
+		}
+	}
+	return nil
+}
+
+// buildCommand assembles the command for one execution of a process.
+//
+// If `"inputs": {}` is given in the payload, nothing is appended to the process
+// command. This allows running processes that do not have any inputs.
+func buildCommand(p pr.Process, inputs map[string]interface{}) ([]string, error) {
+	jsonParams, err := json.Marshal(inputs)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd := []string{}
+	if p.Command != nil {
+		cmd = append(cmd, p.Command...)
+	}
+	if string(jsonParams) != "{}" {
+		cmd = append(cmd, string(jsonParams))
+	}
+	return cmd, nil
+}
+
+// buildJob constructs the job for one execution of a process. It returns nil
+// for a host type the server does not know, which registration already rules
+// out.
+//
+// Single execution and group submission share this, so that a group member is
+// built by exactly the same code as a job submitted on its own and is an
+// ordinary job in every respect.
+func (rh *RESTHandler) buildJob(jobID string, p pr.Process, cmd, tags []string, submitter string, isSync bool) jobs.Job {
+	switch p.Host.Type {
+	case "docker":
+		return &jobs.DockerJob{
+			UUID:           jobID,
+			ProcessName:    p.Info.ID,
+			ProcessVersion: p.Info.Version,
+			Image:          p.Host.Image,
+			Submitter:      submitter,
+			EnvVars:        p.Config.EnvVars,
+			Volumes:        p.Config.Volumes,
+			Resources:      jobs.Resources(p.Config.Resources),
+			Cmd:            cmd,
+			StorageSvc:     rh.StorageSvc,
+			DB:             rh.DB,
+			DoneChan:       rh.MessageQueue.JobDone,
+			Tags:           tags,
+			ResourcePool:   rh.ResourcePool,
+			IsSync:         isSync,
+		}
+
+	case "aws-batch":
+		return &jobs.AWSBatchJob{
+			UUID:        jobID,
+			ProcessName: p.Info.ID,
+			// Image is deliberately not set from the process: for aws-batch the
+			// job definition supplies it, so anything written in the yaml has no
+			// bearing on what runs. It is filled in from the job itself when
+			// provenance is captured, and left empty if that never succeeds.
+			Submitter:      submitter,
+			EnvVars:        p.Config.EnvVars,
+			Cmd:            cmd,
+			JobDef:         p.Host.JobDefinition,
+			JobQueue:       p.Host.JobQueue,
+			JobName:        fmt.Sprintf("%s_%s", rh.Name, jobID),
+			ProcessVersion: p.Info.Version,
+			StorageSvc:     rh.StorageSvc,
+			DB:             rh.DB,
+			DoneChan:       rh.MessageQueue.JobDone,
+			Tags:           tags,
+		}
+
+	case "subprocess":
+		return &jobs.SubprocessJob{
+			UUID:           jobID,
+			ProcessName:    p.Info.ID,
+			Submitter:      submitter,
+			EnvVars:        p.Config.EnvVars,
+			Cmd:            cmd,
+			ProcessVersion: p.Info.Version,
+			Resources:      jobs.Resources(p.Config.Resources),
+			StorageSvc:     rh.StorageSvc,
+			DB:             rh.DB,
+			DoneChan:       rh.MessageQueue.JobDone,
+			Tags:           tags,
+			ResourcePool:   rh.ResourcePool,
+			IsSync:         isSync,
+		}
+	}
+
+	return nil
+}
+
+// dismissActiveJob takes a job out of the pending queue if it is still waiting
+// there, and kills it. Dismissing a group's member goes through here too, so a
+// member is dismissed by exactly the same path as any other job.
+//
+// The bool reports whether the job was still active. One that is not has
+// already finished, and there is nothing to dismiss.
+func (rh *RESTHandler) dismissActiveJob(jobID string) (bool, error) {
+	j, ok := rh.ActiveJobs.Get(jobID)
+	if !ok {
+		return false, nil
+	}
+
+	// Remove from the pending queue if the job has not started yet, so the
+	// resources counted against it while queued stop being reserved for it.
+	if removed := rh.PendingJobs.Remove(jobID); removed != nil {
+		res := (*removed).GetResources()
+		rh.ResourcePool.RemoveQueued(res.CPUs, res.Memory, res.GPUs)
+	}
+
+	return true, (*j).Kill()
+}
+
 // @Summary Execute Process
 // @Description [Execute Process Specification](https://docs.ogc.org/is/18-062r2/18-062r2.html#sc_create_job)
 // @Tags processes
@@ -238,24 +403,18 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, errResponse{Message: err.Error()})
 	}
 
+	if err := rejectReservedTags(params.Tags); err != nil {
+		return c.JSON(http.StatusBadRequest, errResponse{Message: err.Error()})
+	}
+
 	err = p.VerifyInputs(params.Inputs)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, errResponse{Message: err.Error()})
 	}
 
-	jsonParams, err := json.Marshal(params.Inputs)
+	cmd, err := buildCommand(p, params.Inputs)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, errResponse{Message: err.Error()})
-	}
-
-	// If `"Inputs": {}` in `/execution` payload. Nothing will be appended to process commands.
-	// This allow running processes that do not have any inputs.
-	var cmd = []string{}
-	if p.Command != nil {
-		cmd = append(cmd, p.Command...)
-	}
-	if string(jsonParams) != "{}" {
-		cmd = append(cmd, string(jsonParams))
 	}
 
 	// Determine execution mode based on process capabilities and client preference
@@ -277,64 +436,9 @@ func (rh *RESTHandler) Execution(c echo.Context) error {
 	// }
 
 	submitter := c.Request().Header.Get("X-SEPEX-User-Email")
-	var j jobs.Job
-	switch host {
-	case "docker":
-		j = &jobs.DockerJob{
-			UUID:           jobID,
-			ProcessName:    processID,
-			ProcessVersion: p.Info.Version,
-			Image:          p.Host.Image,
-			Submitter:      submitter,
-			EnvVars:        p.Config.EnvVars,
-			Volumes:        p.Config.Volumes,
-			Resources:      jobs.Resources(p.Config.Resources),
-			Cmd:            cmd,
-			StorageSvc:     rh.StorageSvc,
-			DB:             rh.DB,
-			DoneChan:       rh.MessageQueue.JobDone,
-			Tags:           params.Tags,
-			ResourcePool:   rh.ResourcePool,
-			IsSync:         mode == "sync-execute",
-		}
-
-	case "aws-batch":
-		j = &jobs.AWSBatchJob{
-			UUID:        jobID,
-			ProcessName: processID,
-			// Image is deliberately not set from the process: for aws-batch the
-			// job definition supplies it, so anything written in the yaml has no
-			// bearing on what runs. It is filled in from the job itself when
-			// provenance is captured, and left empty if that never succeeds.
-			Submitter:      submitter,
-			EnvVars:        p.Config.EnvVars,
-			Cmd:            cmd,
-			JobDef:         p.Host.JobDefinition,
-			JobQueue:       p.Host.JobQueue,
-			JobName:        fmt.Sprintf("%s_%s", rh.Name, jobID),
-			ProcessVersion: p.Info.Version,
-			StorageSvc:     rh.StorageSvc,
-			DB:             rh.DB,
-			DoneChan:       rh.MessageQueue.JobDone,
-			Tags:           params.Tags,
-		}
-
-	case "subprocess":
-		j = &jobs.SubprocessJob{
-			UUID:           jobID,
-			ProcessName:    processID,
-			Submitter:      submitter,
-			EnvVars:        p.Config.EnvVars,
-			Cmd:            cmd,
-			ProcessVersion: p.Info.Version,
-			Resources:      jobs.Resources(p.Config.Resources),
-			StorageSvc:     rh.StorageSvc,
-			DB:             rh.DB,
-			DoneChan:       rh.MessageQueue.JobDone,
-			Tags:           params.Tags,
-			ResourcePool:   rh.ResourcePool,
-			IsSync:         mode == "sync-execute",
-		}
+	j := rh.buildJob(jobID, p, cmd, params.Tags, submitter, mode == "sync-execute")
+	if j == nil {
+		return c.JSON(http.StatusInternalServerError, errResponse{Message: fmt.Sprintf("unsupported host type %s", host)})
 	}
 
 	// Create job (reserves resources for sync docker/subprocess jobs)
@@ -417,7 +521,7 @@ func (rh *RESTHandler) JobDismissHandler(c echo.Context) error {
 	jobID := c.Param("jobID")
 
 	// 1. Check if job exists in active jobs
-	j, ok := rh.ActiveJobs.Jobs[jobID]
+	j, ok := rh.ActiveJobs.Get(jobID)
 	if !ok {
 		return c.JSON(http.StatusNotFound, errResponse{Message: fmt.Sprintf("job %s not in the active jobs list", jobID)})
 	}
@@ -430,17 +534,8 @@ func (rh *RESTHandler) JobDismissHandler(c echo.Context) error {
 		}
 	}
 
-	// 3. Remove from pending queue if it exists there (job hasn't started yet)
-	removed := rh.PendingJobs.Remove(jobID)
-	if removed != nil {
-		// Job was in queue - update queued resource tracking
-		res := (*removed).GetResources()
-		rh.ResourcePool.RemoveQueued(res.CPUs, res.Memory, res.GPUs)
-	}
-
-	// 4. Kill the job
-	err := (*j).Kill()
-	if err != nil {
+	// 3. Remove from the pending queue if it is waiting there, and kill it
+	if _, err := rh.dismissActiveJob(jobID); err != nil {
 		return c.JSON(http.StatusBadRequest, errResponse{Message: err.Error()})
 	}
 	return c.JSON(http.StatusOK, jobResponse{ProcessID: (*j).ProcessID(), Type: "process", JobID: jobID, Status: (*j).CurrentStatus(), Message: fmt.Sprintf("job %s dismissed", jobID)})
@@ -464,7 +559,7 @@ func (rh *RESTHandler) JobStatusHandler(c echo.Context) (err error) {
 	var jRcrd jobs.JobRecord
 	jobID := c.Param("jobID")
 
-	if job, ok := rh.ActiveJobs.Jobs[jobID]; ok {
+	if job, ok := rh.ActiveJobs.Get(jobID); ok {
 		tags := (*job).TAGS()
 		if tags == nil {
 			tags = []string{}
@@ -517,7 +612,7 @@ func (rh *RESTHandler) JobResultsHandler(c echo.Context) (err error) {
 
 	var jRcrd jobs.JobRecord
 	jobID := c.Param("jobID")
-	if job, ok := rh.ActiveJobs.Jobs[jobID]; ok { // ActiveJobs hit
+	if job, ok := rh.ActiveJobs.Get(jobID); ok { // ActiveJobs hit
 		output := errResponse{HTTPStatus: http.StatusNotFound, Message: fmt.Sprintf("results not ready, job %s", (*job).CurrentStatus())}
 		return prepareResponse(c, http.StatusNotFound, "error", output)
 
@@ -576,7 +671,7 @@ func (rh *RESTHandler) JobMetaDataHandler(c echo.Context) (err error) {
 	var jRcrd jobs.JobRecord
 
 	jobID := c.Param("jobID")
-	if job, ok := rh.ActiveJobs.Jobs[jobID]; ok { // ActiveJobs hit
+	if job, ok := rh.ActiveJobs.Get(jobID); ok { // ActiveJobs hit
 		output := errResponse{HTTPStatus: http.StatusNotFound, Message: fmt.Sprintf("metadata not ready, job %s", (*job).CurrentStatus())}
 		return prepareResponse(c, http.StatusNotFound, "error", output)
 
@@ -634,7 +729,7 @@ func (rh *RESTHandler) JobLogsHandler(c echo.Context) (err error) {
 	var pid, status string
 	var jRcrd jobs.JobRecord
 
-	if job, ok := rh.ActiveJobs.Jobs[jobID]; ok { // ActiveJobs hit
+	if job, ok := rh.ActiveJobs.Get(jobID); ok { // ActiveJobs hit
 		pid = (*job).ProcessID()
 		status = (*job).CurrentStatus()
 		if status == jobs.ACCEPTED { // this prevents AWS Cloudwatch errors where logs are not available till some time after job is started
@@ -787,7 +882,7 @@ func (rh *RESTHandler) JobStatusUpdateHandler(c echo.Context) error {
 
 	jobID := c.Param("jobID")
 
-	if job, ok := rh.ActiveJobs.Jobs[jobID]; ok { // ActiveJobs hit
+	if job, ok := rh.ActiveJobs.Get(jobID); ok { // ActiveJobs hit
 		var sm jobs.StatusMessage
 		sm.Job = job
 		// setup some kind of token/auth to allow only the allowed agents to post to this route
@@ -836,7 +931,7 @@ func (rh *RESTHandler) JobStatusUpdateHandler(c echo.Context) error {
 
 // 	jobID := c.Param("jobID")
 
-// 	if job, ok := rh.ActiveJobs.Jobs[jobID]; ok { // ActiveJobs hit
+// 	if job, ok := rh.ActiveJobs.Get(jobID); ok { // ActiveJobs hit
 // 		err = (*job).WriteResults(dataBytes)
 // 		if err != nil {
 // 			return c.JSON(http.StatusInternalServerError, errResponse{http.StatusInternalServerError, "error writing results"})

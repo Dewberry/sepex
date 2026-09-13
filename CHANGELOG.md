@@ -27,14 +27,28 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Response now includes `usedGPUs`, `queuedGPUs`, `maxGPUs`, and a `gpus` array listing every device with its index, UUID, and the job holding it. The HTML view shows each device as free or in use rather than as a utilization bar, since which device is free is the question that matters. There are no GPU percentage fields, deliberately.
 
+#### POST /processes/:processID/group-execution
+
+- New endpoint to submit many jobs for one process in one request and get a single group ID to track all jobs. The whole request is validated before any job is created or response generated. Jobs are then created in the background.
+
+#### GET /job-groups/:groupID
+
+- New endpoint that reports a group's combined status, a count of its members by status, and one page of members in submission order. Members page with `limit` and `offset`, and filter with `status`, which accepts any job status plus `notCreated` for members whose job could not be created. Answers in HTML or JSON like other GET routes.
+
+#### DELETE /job-groups/:groupID
+
+- New endpoint that dismisses every member that is still accepted or running, in reverse submission order, leaving finished members untouched. Safe to repeat.
+
 ### Features
 
+- Job groups feature is added, through the endpoints of this feature many jobs for one process can be submitted in one request and tracked as one unit, on every host type, with no change to how any member is queued or run. Every member remains an ordinary job at `/jobs/{jobID}` and carries a `group:{groupID}` tag, so a group's jobs are also findable through the ordinary `/jobs` tag filter. The `group:` tag prefix is now reserved for the server and rejected from client payloads. See [GROUPS_GUIDE.md](GROUPS_GUIDE.md).
 - GPUs can now be requested by `docker` processes with `gpus` under `maxResources`, and are **enforced**: a job receives exactly the devices allocated to it, and no other job is placed on them. This is unlike `cpus` and `memory`, which remain advisory scheduling hints and are now documented as such. See [GPU_GUIDE.md](GPU_GUIDE.md).
 - GPU requests that could never be satisfied are rejected at submission with `422` rather than queued indefinitely: more GPUs than the host has, or any GPUs on a `subprocess` process. Process registration is unaffected, so one catalog still loads on GPU and non-GPU hosts alike.
 - Restart recovery reclaims the specific devices a surviving container holds, read back from the container itself, rather than a device count.
 
 ### Configuration
 
+- New `MAX_GROUP_SIZE` environment variable (default: `1000`) capping how many jobs one job group may ask for. A larger request is refused.
 - New `MAX_LOCAL_GPUS` environment variable (flag `-mlg`, default: all detected GPUs) capping how many GPUs the local job queue may allocate. Unlike `MAX_LOCAL_CPUS` and `MAX_LOCAL_MEMORY_MB`, a value that cannot be verified against detected hardware is fatal at startup, because GPUs are enforced and an over-claim would put two jobs on one card.
 - New `SKIP_GPU_VERIFICATION` environment variable (flag `--skip-gpu-verify`, default: `false`) to trust `MAX_LOCAL_GPUS` without enumerating devices, for deployments where the API cannot see the GPUs it schedules onto. Note that a containerized SEPEX cannot see host GPUs unless the API container is itself given GPU visibility.
 - New `SEPEX_DOCKER_NETWORK` environment variable (default: `sepex_net`) to set the docker network that launched job containers are attached to. Set it to `host` to run them with host networking, which is required on EC2 for instance profile credential access.
@@ -44,6 +58,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- The active jobs map was read without its lock by every job endpoint, while other goroutines added to and removed from it. A status request arriving as a job started or finished could take the server down. Reads now go through a locked accessor.
 - AWS Batch log stream lookup read the region from `AWS_DEFAULT_REGION`, which the API never defines, leaving the request without a region. All AWS calls now resolve the region from `AWS_REGION`.
 - The erroneous Docker Hub digest lookup was removed and will be implemented later.
 
