@@ -9,6 +9,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Unreleased
 
+## [0.3.0-rc.1] - 2026-09-13
+
 ### API
 
 #### POST /processes/:processID/execution
@@ -146,7 +148,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 - Initial release with core API endpoints for process and job management
 
-[Unreleased]: https://github.com/Dewberry/sepex/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/Dewberry/sepex/compare/v0.3.0-rc.1...HEAD
+[0.3.0-rc.1]: https://github.com/Dewberry/sepex/releases/tag/v0.3.0-rc.1
 [0.2.2]: https://github.com/Dewberry/sepex/releases/tag/v0.2.2
 [0.2.1]: https://github.com/Dewberry/sepex/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Dewberry/sepex/releases/tag/v0.2.0
