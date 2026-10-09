@@ -1,0 +1,8 @@
+{
+  "name": "sepex-deployment",
+  "private": true,
+  "description": "Pins the AWS CDK CLI used by deployment/scripts and action.yml",
+  "devDependencies": {
+    "aws-cdk": "2.1145.0"
+  }
+}

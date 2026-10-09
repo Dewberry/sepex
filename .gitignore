@@ -23,3 +23,13 @@ settings.json
 
 
 .miniodata/
+
+# AWS CDK and deployment tooling (cdk.context.json caches account-specific lookups)
+cdk.context.json
+cdk.out/
+node_modules/
+.venv/
+.ruff_cache/
+__pycache__/
+sepex-job-*.json
+plugin-examples/python/pyecho/scratch

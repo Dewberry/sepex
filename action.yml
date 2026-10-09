@@ -1,0 +1,56 @@
+name: Deploy SEPEX Batch job
+description: Deploy an AWS Batch compute environment, queue, and job definition for a SEPEX process into an existing SEPEX stack's VPC
+inputs:
+  config-path:
+    description: Process YAML (schemas/aws-batch-job.schema.json), relative to the workspace or absolute
+    required: true
+  aws-region:
+    description: AWS region of the SEPEX stack
+    required: true
+  aws-role-arn:
+    description: AWS role to assume with the workflow's OIDC token (see deployment/README.md for its permissions)
+    required: true
+  sepex-stack:
+    description: Name of the deployed SEPEX stack whose VPC the job runs in
+    required: false
+    default: SepexStack
+  stack-name:
+    description: CloudFormation stack name for this process (default <sepex-stack>-<info.id>)
+    required: false
+    default: ""
+outputs:
+  job-definition-arn:
+    description: ARN of the deployed Batch job definition revision
+    value: ${{ steps.deploy.outputs.job-definition-arn }}
+  job-definition:
+    description: Job definition as name:revision, for host.jobDefinition in the process YAML
+    value: ${{ steps.deploy.outputs.job-definition }}
+runs:
+  using: composite
+  steps:
+    - name: Set up uv
+      uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+
+    - name: Set up Node.js
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: 22
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+      with:
+        role-to-assume: ${{ inputs.aws-role-arn }}
+        aws-region: ${{ inputs.aws-region }}
+
+    - name: Deploy Batch job
+      id: deploy
+      shell: bash
+      # Inputs pass through env, never ${{ }} in the script, to avoid script injection.
+      env:
+        CONFIG_PATH: ${{ inputs.config-path }}
+        SEPEX_STACK: ${{ inputs.sepex-stack }}
+        JOB_STACK: ${{ inputs.stack-name }}
+      run: |
+        config=$CONFIG_PATH
+        [[ $config == /* ]] || config="$GITHUB_WORKSPACE/$config"
+        bash "$GITHUB_ACTION_PATH/deployment/scripts/deploy-job.sh" --yes "$config"

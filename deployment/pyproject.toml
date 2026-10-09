@@ -1,0 +1,23 @@
+[project]
+name = "sepex-deployment"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "aws-cdk-lib>=2.200,<3",
+    "constructs>=10,<11",
+    "jsonschema>=4,<5",
+    "pyyaml>=6.0.3",
+]
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1,<2",
+    "ruff>=0.12,<1",
+]
+
+[tool.uv]
+package = false
+
+[tool.pyright]
+include = ["app.py", "stacks", "functions", "scripts", "tests"]
+pythonVersion = "3.11"

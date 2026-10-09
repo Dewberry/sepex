@@ -1,0 +1,6 @@
+{
+  "app": "uv run --locked python app.py",
+  "context": {
+    "sepexStack": "SepexStack"
+  }
+}

@@ -2,9 +2,6 @@ import json
 import os
 import urllib.request
 
-# Define the endpoint URL as an environment variable in the Lambda function
-ENDPOINT_URL = os.environ.get("SEPEX_URL")
-
 
 def map_batch_status_to_ogc_status(batch_status):
     """Map AWS Batch job statuses to OGC statuses."""
@@ -29,8 +26,15 @@ def lambda_handler(event, _):
     status = event["detail"]["status"]
     event_time = event["time"]
 
+    if not job_name.startswith(f"{os.environ['API_NAME']}_") or status not in (
+        "RUNNING",
+        "SUCCEEDED",
+        "FAILED",
+    ):
+        return
+
     job_id = job_name.rpartition("_")[2]
-    url = f"{ENDPOINT_URL}/jobs/{job_id}/status"
+    url = f"{os.environ['SEPEX_URL']}/jobs/{job_id}/status"
 
     ogc_status = map_batch_status_to_ogc_status(status)
     payload = {"status": ogc_status, "updated": event_time}

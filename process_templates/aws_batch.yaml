@@ -16,17 +16,23 @@ info:
 
 # host are process execution platforms such as, 'docker' or 'aws-batch' or 'subprocess'
 # fields that are not related to a particular host can be omitted
+# processes deployed with deployment/scripts/deploy-job.sh must also satisfy
+# schemas/aws-batch-job.schema.json (see deployment/README.md)
 host:
   type: "aws-batch"
   # pin the job definition to a revision, as `name:revision`
   # without a revision Batch runs whichever one is latest at submission, so two
   # runs of this same process version can execute different code
+  # deploy-job.sh creates the revision, so deploy with a bare name first, then
+  # edit this to the `name:revision` it prints before registering the process
   jobDefinition: process-sandbox:2
   jobQueue: micro-test
-  # `image` is not set for `aws-batch`, the job definition supplies it
-  # for reproducible runs the image in that job definition revision should itself
-  # be digest pinned, as `repository@sha256:...` rather than a moving tag
-  # the API warns at startup when either is unpinned, it does not refuse to load
+  # the API ignores `image` for `aws-batch`, the job definition supplies it
+  # deploy-job.sh requires it and builds the job definition from it, as a tag
+  # (`repository:tag`) or, for reproducible runs, a digest (`repository@sha256:...`)
+  # the API warns at startup when the job definition or its image is unpinned,
+  # it does not refuse to load
+  image: ghcr.io/example/aep-grid@sha256:<64 hex digits>
 
 # commands for the container, it only overwrite commands, not entrypoint
 # if an image has entrypoint defined, commands will be appended
@@ -36,13 +42,16 @@ command:
 
 config:
   # max resources the container can use
-  # not implemented for `aws-batch` job, should be defined in Batch job definition
-  # this includes GPUs, which come from the job definition's resourceRequirements
-  # maxResources:
+  # the API ignores this for `aws-batch`, the job definition sets the limits
+  # deploy-job.sh requires it and rounds up to the nearest valid Fargate size
+  # GPUs are not supported by deploy-job.sh; define them in a hand-made job definition
+  maxResources:
+    cpus: 1
+    memory: 2048 # MiB
   # env variable keys that need to be passed to container, e.g. AEPGRID_AWS_ACCESS_KEY_ID etc
   # could be defined here or in Batch job definition or both
   # they would be passed to the container with prefix AEPGRID_ removed
-  envVars:
+  envVars: []
   # not implemented for `aws-batch` job, should be defined in Batch job definition
   # volumes:
 

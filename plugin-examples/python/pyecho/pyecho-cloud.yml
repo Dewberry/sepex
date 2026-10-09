@@ -1,0 +1,49 @@
+# AWS Batch (Fargate) version of pyecho.yml, deployable with deployment/scripts/deploy-job.sh.
+# Validated against schemas/aws-batch-job.schema.json; see deployment/README.md.
+info:
+  version: '0.0.1'
+  id: pyecho-cloud
+  title: Echo Demo (AWS Batch)
+  description: Echos the passed input (from an example python plugin) using AWS Batch
+  jobControlOptions:
+    - async-execute
+  outputTransmission:
+    - value
+
+host:
+  type: aws-batch
+  # After deploying, pin the revision the deploy printed, e.g. pyecho-cloud:1
+  jobDefinition: pyecho-cloud
+  jobQueue: pyecho-cloud
+  # Public image built by publish.sh; use repository@sha256:<digest> for reproducible runs.
+  image: docker.io/lawlerseth/pyecho:v0.0.1
+
+command:
+  - python
+  - main.py
+
+config:
+  # Rounded up to the nearest Fargate size (0.25 vCPU / 512 MiB minimum).
+  maxResources:
+    cpus: 0.25
+    memory: 512
+
+inputs:
+  - id: text
+    title: text
+    description: user provided text string
+    input:
+      literalDataDomain:
+        dataType: value
+        valueDefinition:
+          anyValue: true
+    minOccurs: 1
+    maxOccurs: 1
+
+outputs:
+  - id: message
+    title: message
+    description: output message (same as user provided text string)
+    output:
+      transmissionMode:
+        - value

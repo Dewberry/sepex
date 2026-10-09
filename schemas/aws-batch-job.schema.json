@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SEPEX AWS Batch process deployment configuration",
+  "description": "A SEPEX process YAML with host.type aws-batch, as deployed by deployment/ (scripts/deploy-job.sh and action.yml).",
+  "type": "object",
+  "required": ["info", "host", "command", "config"],
+  "properties": {
+    "info": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" }
+      }
+    },
+    "host": {
+      "type": "object",
+      "required": ["type", "jobDefinition", "jobQueue", "image"],
+      "properties": {
+        "type": { "const": "aws-batch" },
+        "jobDefinition": {
+          "description": "name, name:revision, or job definition ARN; pin the revision before registering with SEPEX",
+          "type": "string",
+          "pattern": "^(arn:[^:]+:batch:[^:]+:[0-9]{12}:job-definition/)?[A-Za-z0-9_-]{1,128}(:[0-9]+)?$"
+        },
+        "jobQueue": { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$" },
+        "image": {
+          "description": "Image with an explicit tag or digest, e.g. repo:1.0 or repo@sha256:<digest>",
+          "type": "string",
+          "pattern": "^[^\\s@]+(:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}|@sha256:[a-f0-9]{64})$"
+        }
+      }
+    },
+    "command": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" }
+    },
+    "config": {
+      "type": "object",
+      "required": ["maxResources"],
+      "properties": {
+        "maxResources": {
+          "type": "object",
+          "required": ["cpus", "memory"],
+          "properties": {
+            "cpus": { "type": "number", "exclusiveMinimum": 0 },
+            "memory": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "envVars": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "volumes": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "inputs": { "type": "array" },
+    "outputs": { "type": "array" }
+  }
+}

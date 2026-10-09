@@ -77,6 +77,10 @@ docker pull ghcr.io/dewberry/sepex:dev
 
 Pin to a released version for a reproducible setup as `dev` and `latest` are movable and `sha-` tags older than two weeks are pruned.
 
+### Deploying to AWS
+
+To run SEPEX on AWS with AWS Batch jobs, follow [deployment/README.md](deployment/README.md).
+
 ---
 
 ## System Components
