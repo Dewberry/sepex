@@ -452,7 +452,7 @@
            "// Registration must succeed even where the GPUs do not exist: one process",
            "// catalog is meant to load on GPU and non-GPU hosts alike.",
            "pm.test('GPU process registers on a host without GPUs', function () {",
-           "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+           "    pm.expect(pm.response.code, pm.response.text()).to.be.oneOf([200, 201]);",
            "});"
           ]
          }
@@ -463,7 +463,7 @@
         "header": [],
         "body": {
          "mode": "raw",
-         "raw": "{\n    \"info\": {\n        \"version\": \"1.0.0\",\n        \"id\": \"gpuDockerTest\",\n        \"title\": \"gpuDockerTest\",\n        \"description\": \"GPU e2e fixture\",\n        \"jobControlOptions\": [\n            \"sync-execute\",\n            \"async-execute\"\n        ],\n        \"outputTransmission\": [\n            \"value\"\n        ]\n    },\n    \"host\": {\n        \"type\": \"docker\",\n        \"image\": \"public.ecr.aws/docker/library/alpine:3.20\"\n    },\n    \"command\": [\n        \"echo\",\n        \"hello\"\n    ],\n    \"config\": {\n        \"maxResources\": {\n            \"cpus\": 0.1,\n            \"memory\": 128,\n            \"gpus\": 99\n        }\n    },\n    \"inputs\": [],\n    \"outputs\": []\n}",
+         "raw": "{\n    \"info\": {\n        \"version\": \"1.0.0\",\n        \"id\": \"gpuDockerTest\",\n        \"title\": \"gpuDockerTest\",\n        \"description\": \"GPU e2e fixture\",\n        \"jobControlOptions\": [\n            \"sync-execute\",\n            \"async-execute\"\n        ],\n        \"outputTransmission\": [\n            \"value\"\n        ]\n    },\n    \"host\": {\n        \"type\": \"docker\",\n        \"image\": \"pyecho:latest\"\n    },\n    \"command\": [\n        \"echo\",\n        \"hello\"\n    ],\n    \"config\": {\n        \"maxResources\": {\n            \"cpus\": 0.1,\n            \"memory\": 128,\n            \"gpus\": 99\n        }\n    },\n    \"inputs\": [],\n    \"outputs\": []\n}",
          "options": {
           "raw": {
            "language": "json"

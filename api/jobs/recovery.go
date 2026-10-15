@@ -377,6 +377,7 @@ func recoverAWSBatchJobsFromRecords(
 			continue
 		}
 
+		j.wgRun.Add(1)
 		var job Job = j
 		active.Add(&job)
 		j.logger.Info("Job recovered after restart. Some features might be missing")
@@ -395,17 +396,14 @@ func recoverAWSBatchJobsFromRecords(
 			go j.ensureImageProvenance()
 
 		case "SUCCESSFUL":
-			j.NewStatusUpdate(SUCCESSFUL, time.Now())
 			go j.WriteMetaData()
-			go j.Close()
-
-		case "FAILED":
-			j.NewStatusUpdate(FAILED, time.Now())
-			go j.Close()
-
-		case "DISMISSED":
-			j.NewStatusUpdate(DISMISSED, time.Now())
-			go j.Close()
+			fallthrough
+		case "FAILED", "DISMISSED":
+			j.NewStatusUpdate(status, time.Now())
+			go func() {
+				j.Close()
+				j.RunFinished()
+			}()
 		}
 	}
 
