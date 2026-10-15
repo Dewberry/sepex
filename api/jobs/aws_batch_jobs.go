@@ -26,7 +26,9 @@ type AWSBatchJob struct {
 	// Used for monitoring meta data and other routines
 	wg sync.WaitGroup
 	// Used for monitoring running complete for sync jobs
-	wgRun sync.WaitGroup
+	wgRun           sync.WaitGroup
+	runFinishedOnce sync.Once
+	closeOnce       sync.Once
 
 	UUID           string `json:"jobID"`
 	AWSBatchID     string
@@ -423,7 +425,10 @@ func (j *AWSBatchJob) Kill() error {
 	// Close being graceful or not does not matter.
 
 	defer func() {
-		go j.Close()
+		go func() {
+			j.Close()
+			j.RunFinished()
+		}()
 	}()
 	return nil
 }
@@ -582,11 +587,17 @@ func (j *AWSBatchJob) WriteMetaData() {
 // }
 
 func (j *AWSBatchJob) RunFinished() {
-	j.wgRun.Done()
+	j.runFinishedOnce.Do(func() {
+		j.wgRun.Done()
+	})
 }
 
 // Write final logs, cancelCtx
 func (j *AWSBatchJob) Close() {
+	j.closeOnce.Do(j.close)
+}
+
+func (j *AWSBatchJob) close() {
 	// to do: add panic recover to remove job from active jobs even if following panics
 	j.ctxCancel()
 	const maxAttempts = 5

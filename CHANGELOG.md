@@ -9,6 +9,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## Unreleased
 
+### Fixed
+
+- Recovered AWS Batch jobs now initialize their completion wait group. Duplicate terminal updates and dismissal no longer complete or clean up a job more than once.
+
 ## [0.3.0-rc.1] - 2026-09-13
 
 ### API
