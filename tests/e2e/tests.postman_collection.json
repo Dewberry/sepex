@@ -452,7 +452,7 @@
            "// Registration must succeed even where the GPUs do not exist: one process",
            "// catalog is meant to load on GPU and non-GPU hosts alike.",
            "pm.test('GPU process registers on a host without GPUs', function () {",
-           "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+           "    pm.expect(pm.response.code, pm.response.text()).to.be.oneOf([200, 201]);",
            "});"
           ]
          }
