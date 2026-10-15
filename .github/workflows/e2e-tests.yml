@@ -64,7 +64,7 @@ jobs:
         run: |
           cd plugin-examples
           chmod +x build.sh
-          ./build.sh &
+          ./build.sh
 
       - name: Build the docker compose stack
         run: docker compose -f docker-compose.prod.yml build
