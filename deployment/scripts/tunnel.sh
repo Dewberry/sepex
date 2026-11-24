@@ -22,6 +22,11 @@ resolve_region
 
 instance_id=$(sepex_instance_id)
 printf 'SEPEX API: http://localhost:%s (Ctrl+C to stop)\n' "$LOCAL_PORT"
-exec aws ssm start-session --target "$instance_id" \
-	--document-name AWS-StartPortForwardingSession \
-	--parameters "{\"portNumber\":[\"80\"],\"localPortNumber\":[\"$LOCAL_PORT\"]}"
+trap 'exit 0' INT TERM
+while :; do
+	aws ssm start-session --target "$instance_id" \
+		--document-name AWS-StartPortForwardingSession \
+		--parameters "{\"portNumber\":[\"80\"],\"localPortNumber\":[\"$LOCAL_PORT\"]}" || true
+	printf 'Tunnel closed; reconnecting in 5 seconds (Ctrl+C to stop).\n' >&2
+	sleep 5
+done
