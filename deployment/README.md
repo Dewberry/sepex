@@ -12,7 +12,7 @@ Use the scripts in [scripts/](scripts/) to deploy, update, connect to, and remov
 ## What gets deployed
 
 - **SEPEX stack** ([stacks/sepex.py](stacks/sepex.py)):
-  - By default, a VPC across 2 AZs with public, private-with-egress and isolated subnets, one shared NAT gateway, and an S3 gateway endpoint. An existing VPC can be selected instead.
+  - By default, a VPC across 2 AZs with public, private-with-egress and isolated subnets, one shared NAT gateway, and an S3 gateway endpoint. In an existing VPC, SEPEX creates two private subnets routed through an existing public NAT gateway.
   - EC2 `t3.small` running Ubuntu 24.04 and the API in Docker, on a 50 GiB encrypted disk. It has no public IP and requires IMDSv2.
   - RDS PostgreSQL 16 (`t4g.micro`, encrypted, 7-day backups). It is **deleted without a final snapshot** when the stack is deleted.
   - Versioned, private, encrypted S3 bucket. All object versions and the bucket are **deleted** with the stack.
@@ -60,12 +60,15 @@ API_IMAGE=ghcr.io/dewberry/sepex@sha256:<digest> bash deployment/scripts/deploy.
 - To reuse an existing VPC, set `SEPEX_VPC_ID` on every infrastructure deployment:
 
   ```sh
-  SEPEX_VPC_ID=vpc-0123456789abcdef0 API_IMAGE=ghcr.io/dewberry/sepex@sha256:<digest> bash deployment/scripts/deploy.sh
+  SEPEX_VPC_ID=vpc-0123456789abcdef0 \
+  SEPEX_NAT_GATEWAY_ID=nat-0123456789abcdef0 \
+  SEPEX_PRIVATE_SUBNET_CIDRS=172.31.0.0/24,172.31.1.0/24 \
+  API_IMAGE=ghcr.io/dewberry/sepex@sha256:<digest> bash deployment/scripts/deploy.sh
   ```
 
-  - CDK looks up the VPC and uses its private-with-egress subnets; this stack creates no VPC, NAT gateway, or S3 endpoint in this mode.
-  - The VPC must have private-with-egress subnets in at least two AZs and routes/endpoints that let the API and Batch jobs reach their image registries and required AWS services. Existing routes and endpoints are not changed.
-  - The lookup runs during CDK synthesis and needs credentials with EC2 describe permissions. Keep `SEPEX_VPC_ID` set for later infrastructure deployments, or CDK will synthesize the managed-VPC configuration instead.
+  - Replace the example VPC, public NAT gateway, and CIDRs with values for your account. First check the VPC's address range with `aws ec2 describe-vpcs --vpc-ids <vpc-id> --query 'Vpcs[0].CidrBlock' --output text`, then list occupied ranges with `aws ec2 describe-subnets --filters Name=vpc-id,Values=<vpc-id> --query 'Subnets[].CidrBlock' --output text`. A `/24` uses all 256 addresses with the same first three numbers; a `/20` covers 16 consecutive `/24` ranges. For example, in a `172.31.0.0/16` VPC, if the existing subnets are `172.31.10.0/24`, `172.31.32.0/20`, `172.31.64.0/20`, and `172.31.80.0/20`, then `172.31.0.0/24` and `172.31.1.0/24` are unused choices for the two new subnets, as shown in the command above. Do not choose `172.31.65.0/24`: it falls inside the existing `172.31.64.0/20`. The two CIDRs must be inside the VPC, **unused and non-overlapping**, and each at least /28 in size. Recheck immediately before deploying: CDK checks its cached VPC lookup, but AWS rejects conflicts if the cache is stale.
+  - CDK creates a subnet and route table in each of the first two VPC availability zones, with default routes to the supplied NAT gateway. It does not create a VPC, NAT gateway, or S3 endpoint, or alter existing subnet routes. The NAT gateway must have working outbound internet access for the API and Batch jobs.
+  - The lookup runs during synthesis and needs EC2 describe permissions; `deploy.sh` also checks that the NAT gateway is public, available, and in the selected VPC. Keep all three `SEPEX_*` network variables set to the same values on later infrastructure deployments.
 - **Warning:** infrastructure changes that alter the server's boot script replace the EC2 instance. Its local disk, including registered plugins in `/opt/sepex/data`, is lost. The `cdk diff` output shows this as a replacement of `ApiInstance`.
 
 ## Connect to the API
@@ -76,6 +79,7 @@ bash deployment/scripts/tunnel.sh        # keep running
 ```
 
 - `LOCAL_PORT=<port>` changes the local port.
+- The tunnel reconnects after an SSM session ends; requests may fail briefly while it reconnects. Press Ctrl+C to stop it.
 - (Optional) SSH:
 
   ```sh
@@ -262,6 +266,8 @@ bash deployment/scripts/destroy.sh                           # then the SEPEX st
 | --- | --- | --- | --- |
 | `SEPEX_STACK` | all scripts | `SepexStack` | SEPEX stack name |
 | `SEPEX_VPC_ID` | `deploy.sh` | create a VPC | Existing VPC to reuse; keep set on subsequent infrastructure deploys |
+| `SEPEX_NAT_GATEWAY_ID` | `deploy.sh` | none | Required with `SEPEX_VPC_ID`; existing public NAT gateway in that VPC |
+| `SEPEX_PRIVATE_SUBNET_CIDRS` | `deploy.sh` | none | Required with `SEPEX_VPC_ID`; two unused IPv4 CIDRs for stack-owned subnets |
 | `API_IMAGE` | `deploy.sh` (first deploy), `update-api.sh` | none | API image as `repository@sha256:<digest>` |
 | `AWS_PROFILE` | all scripts | default credential chain | AWS credentials |
 | `AWS_REGION` | all scripts | profile region | Target region |
