@@ -19,8 +19,9 @@ Use the scripts in [scripts/](scripts/) to deploy, update, connect to, and remov
   - Lambda and EventBridge rule that report Batch job status changes back to the API.
   - SSM parameters under `/sepex/<stack>/`: `api-image`, `vpc-id`, `private-subnet-ids`.
 - **Job stack** ([stacks/job.py](stacks/job.py)):
-  - Fargate compute environment, job queue (`host.jobQueue`), and job definition (`host.jobDefinition`).
+  - Fargate compute environment by default, or managed on-demand EC2 when `host.instanceType` is set; job queue (`host.jobQueue`) and job definition (`host.jobDefinition`).
   - Reads the VPC from the SEPEX stack's SSM parameters, so it needs no account-specific config.
+  - Gives each job a task role with S3 read/write actions on any bucket; bucket policies must also allow access.
 - **Cost notes:** EC2, RDS, and the NAT gateway continue to accrue hourly charges while deployed. Fargate, S3, data transfer, and logs depend on usage.
 
 ## Prerequisites
@@ -102,7 +103,7 @@ bash deployment/scripts/update-api.sh    # restart the current image
 1. Build and push the process image. Reference it as `repository:tag` or `repository@sha256:<digest>`; a digest is preferred.
 2. Write the process YAML:
    - Start from [process_templates/aws_batch.yaml](../process_templates/aws_batch.yaml).
-   - It must match [schemas/aws-batch-job.schema.json](../schemas/aws-batch-job.schema.json): `info.id`, `host.jobDefinition`, `host.jobQueue`, `host.image`, `config.maxResources`, and `command`.
+   - It must match [schemas/aws-batch-job.schema.json](../schemas/aws-batch-job.schema.json): `info.id`, `host.jobDefinition`, `host.jobQueue`, `host.image`, `config.maxResources`, and `command`. Optional `host.environment` (a string map) sets fixed environment variables on the job definition.
    - Example: [plugin-examples/python/pyecho/pyecho-cloud.yml](../plugin-examples/python/pyecho/pyecho-cloud.yml).
 3. Deploy it:
 
@@ -111,7 +112,7 @@ bash deployment/scripts/update-api.sh    # restart the current image
    ```
 
    - The stack name defaults to `<SEPEX_STACK>-<info.id>`. Override it with `JOB_STACK=<name>`.
-   - CPU and memory are rounded up to the nearest valid Fargate size.
+  - CPU and memory are rounded up to the nearest valid Fargate size. EC2 jobs use the requested resources without rounding.
 4. **Pin the job definition revision by hand.**
    - The revision number only exists after the deploy, so the YAML cannot contain it beforehand.
    - Edit `host.jobDefinition` to the `name:revision` that `deploy-job.sh` prints, e.g. `pyecho-cloud:3`.
@@ -125,6 +126,32 @@ bash deployment/scripts/update-api.sh    # restart the current image
 
    - Use `--update` to replace a process that is already registered.
    - Use `--url` or `SEPEX_URL` to target an API other than `http://localhost:8080`.
+
+### EC2 GPU jobs
+
+Set `host.instanceType` to select EC2 instead of Fargate. Request GPUs explicitly so Batch assigns them to the container:
+
+```yaml
+host:
+  type: aws-batch
+  jobDefinition: gpu-example
+  jobQueue: gpu-example
+  instanceType: g4dn.xlarge
+  maxvCpus: 40
+  image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/gpu-app:latest
+command: []
+config:
+  maxResources:
+    cpus: 4
+    memory: 15000
+    gpus: 1
+```
+
+This is a fragment of the process YAML; keep its `info`, `inputs`, and `outputs`. Replace the sample job names and image with values for your application. Deploy, pin the printed revision, register, and submit it using the same commands above. Submit inputs that match the process's declared schema. The image must contain the GPU-enabled application and compatible CUDA libraries; Batch supplies the host NVIDIA driver, not application dependencies.
+
+GPU jobs use the ECS-optimized Amazon Linux 2023 NVIDIA AMI. Only the specified instance type is allowed. EC2 CPU requests must be whole numbers, and memory must leave room for the instance OS and ECS agent; `g4dn.xlarge` has 4 vCPUs, 16 GiB RAM, and one NVIDIA T4 GPU. The compute environment scales from zero. Optional `host.maxvCpus` sets its fleet vCPU maximum independently of per-job `config.maxResources.cpus`; it must be a positive integer and requires `host.instanceType`. If omitted, it defaults to the larger of 4 and the job CPU request. The example's 40 fleet vCPUs allow ten 4-vCPU workers, each running one GPU job. Batch's `BEST_FIT_PROGRESSIVE` allocation can exceed this maximum by one instance. Instances incur on-demand charges until Batch scales them down, and cold starts take longer than warm submissions.
+
+The target region and selected private subnet availability zones must offer `g4dn.xlarge`. Check your regional EC2 On-Demand G/VT vCPU quota before deploying; ten workers require 40 available vCPUs. Ensure the job environment can pull the image from its registry. Private ECR pulls require repository access, including a repository policy for cross-account pulls. Existing S3 bucket policies and SSE-KMS permissions still apply.
 
 ## Deploy a process from GitHub Actions
 

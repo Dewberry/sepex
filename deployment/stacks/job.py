@@ -20,7 +20,12 @@ from aws_cdk import (
 )
 from constructs import Construct
 
-from stacks.shared import AZ_COUNT, REPO_ROOT, parameter_name
+from stacks.shared import (
+    AZ_COUNT,
+    REPO_ROOT,
+    grant_bucket_read_write,
+    parameter_name,
+)
 
 SCHEMA_PATH = REPO_ROOT / "schemas" / "aws-batch-job.schema.json"
 
@@ -103,16 +108,46 @@ class JobStack(Stack):
             "Batch only uses subnet IDs.",
         )
 
-        compute_env = aws_batch.FargateComputeEnvironment(
-            self,
-            "FargateComputeEnvironment",
-            vpc=vpc,
-            vpc_subnets=aws_ec2.SubnetSelection(
-                subnet_type=aws_ec2.SubnetType.PRIVATE_WITH_EGRESS
-            ),
-        )
-
         host = job["host"]
+        resources = job["config"]["maxResources"]
+        instance_type = host.get("instanceType")
+        gpu = resources.get("gpus", 0)
+        if gpu and not instance_type:
+            raise ValueError("config.maxResources.gpus requires host.instanceType")
+        compute_env: aws_batch.IComputeEnvironment
+        if instance_type:
+            compute_env = aws_batch.ManagedEc2EcsComputeEnvironment(
+                self,
+                "Ec2ComputeEnvironment",
+                vpc=vpc,
+                instance_types=[aws_ec2.InstanceType(instance_type)],
+                use_optimal_instance_classes=False,
+                images=[
+                    aws_batch.EcsMachineImage(
+                        image_type=(
+                            aws_batch.EcsMachineImageType.ECS_AL2023_NVIDIA
+                            if gpu
+                            else aws_batch.EcsMachineImageType.ECS_AL2023
+                        )
+                    )
+                ],
+                minv_cpus=0,
+                maxv_cpus=host.get("maxvCpus", max(4, math.ceil(resources["cpus"]))),
+                allocation_strategy=aws_batch.AllocationStrategy.BEST_FIT_PROGRESSIVE,
+                vpc_subnets=aws_ec2.SubnetSelection(
+                    subnet_type=aws_ec2.SubnetType.PRIVATE_WITH_EGRESS
+                ),
+            )
+        else:
+            compute_env = aws_batch.FargateComputeEnvironment(
+                self,
+                "FargateComputeEnvironment",
+                vpc=vpc,
+                vpc_subnets=aws_ec2.SubnetSelection(
+                    subnet_type=aws_ec2.SubnetType.PRIVATE_WITH_EGRESS
+                ),
+            )
+
         aws_batch.JobQueue(
             self,
             "JobQueue",
@@ -124,17 +159,46 @@ class JobStack(Stack):
             ],
         )
 
-        resources = job["config"]["maxResources"]
-        cpu, memory = _fargate_resources(resources["cpus"], resources["memory"])
-        container = aws_batch.EcsFargateContainerDefinition(
-            self,
-            "containerDefn",
-            image=aws_ecs.ContainerImage.from_registry(host["image"]),
-            memory=Size.mebibytes(memory),
-            cpu=cpu,
-            command=job["command"],
-            # TODO: accept a job role from the process config so jobs can call AWS (e.g. S3).
+        cpu, memory = (
+            (resources["cpus"], resources["memory"])
+            if instance_type
+            else _fargate_resources(resources["cpus"], resources["memory"])
         )
+        job_role = aws_iam.Role(
+            self,
+            "JobRole",
+            assumed_by=aws_iam.ServicePrincipal(
+                "ecs-tasks.amazonaws.com"
+            ),  # pyright: ignore[reportArgumentType]
+        )
+        grant_bucket_read_write(job_role, self.partition)
+
+        container: (
+            aws_batch.EcsEc2ContainerDefinition | aws_batch.EcsFargateContainerDefinition
+        )
+        if instance_type:
+            container = aws_batch.EcsEc2ContainerDefinition(
+                self,
+                "containerDefn",
+                image=aws_ecs.ContainerImage.from_registry(host["image"]),
+                memory=Size.mebibytes(memory),
+                cpu=cpu,
+                gpu=gpu or None,
+                command=job["command"],
+                environment=host.get("environment"),
+                job_role=job_role,  # pyright: ignore[reportArgumentType]
+            )
+        else:
+            container = aws_batch.EcsFargateContainerDefinition(
+                self,
+                "containerDefn",
+                image=aws_ecs.ContainerImage.from_registry(host["image"]),
+                memory=Size.mebibytes(memory),
+                cpu=cpu,
+                command=job["command"],
+                environment=host.get("environment"),
+                job_role=job_role,  # pyright: ignore[reportArgumentType]
+            )
         container.execution_role.add_managed_policy(
             aws_iam.ManagedPolicy.from_aws_managed_policy_name(
                 "service-role/AmazonECSTaskExecutionRolePolicy"
