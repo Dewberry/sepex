@@ -36,6 +36,8 @@ else:
         app,
         sepex_stack,
         existing_vpc_id=os.environ.get("SEPEX_VPC_ID") or None,
+        private_subnet_cidrs=os.environ.get("SEPEX_PRIVATE_SUBNET_CIDRS"),
+        nat_gateway_id=os.environ.get("SEPEX_NAT_GATEWAY_ID"),
         env=env,
     )
 

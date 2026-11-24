@@ -14,8 +14,8 @@ Use the scripts in [scripts/](scripts/) to deploy, update, connect to, and remov
 - **SEPEX stack** ([stacks/sepex.py](stacks/sepex.py)):
   - By default, a VPC across 2 AZs with public, private-with-egress and isolated subnets, one shared NAT gateway, and an S3 gateway endpoint. An existing VPC can be selected instead.
   - EC2 `t3.small` running Ubuntu 24.04 and the API in Docker, on a 50 GiB encrypted disk. It has no public IP and requires IMDSv2.
-  - RDS PostgreSQL 16 (`t4g.micro`, encrypted, 7-day backups, deletion protection). It is **retained** when the stack is deleted.
-  - Versioned, private, encrypted S3 bucket. It is **retained** when the stack is deleted.
+  - RDS PostgreSQL 16 (`t4g.micro`, encrypted, 7-day backups). It is **deleted without a final snapshot** when the stack is deleted.
+  - Versioned, private, encrypted S3 bucket. All object versions and the bucket are **deleted** with the stack.
   - Lambda and EventBridge rule that report Batch job status changes back to the API.
   - SSM parameters under `/sepex/<stack>/`: `api-image`, `vpc-id`, `private-subnet-ids`.
 - **Job stack** ([stacks/job.py](stacks/job.py)):
@@ -204,16 +204,30 @@ jobs:
 
 ## Tear down
 
+**This permanently removes SEPEX data. Back it up and verify the backup before confirming.**
+
+1. Export the database. Install PostgreSQL client tools (`pg_dump` and `pg_restore`) locally. Read the database username and password from the stack's Secrets Manager secret; do not paste the password into a command or shell history. Start a tunnel in one terminal:
+
+   ```sh
+   instance_id=$(aws cloudformation describe-stacks --stack-name "${SEPEX_STACK:-SepexStack}" --query "Stacks[0].Outputs[?OutputKey=='SepexInstanceId'].OutputValue | [0]" --output text)
+   db_host=$(aws cloudformation describe-stacks --stack-name "${SEPEX_STACK:-SepexStack}" --query "Stacks[0].Outputs[?OutputKey=='SepexDatabaseEndpoint'].OutputValue | [0]" --output text)
+   aws ssm start-session --target "$instance_id" --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters "host=$db_host,portNumber=5432,localPortNumber=15432"
+   ```
+
+   In another terminal, run `PGSSLMODE=require pg_dump -h 127.0.0.1 -p 15432 -U sepex_app -F c -f sepex.dump sepex`. Enter the password at the prompt. Verify the archive with `pg_restore -l sepex.dump` and restore it to the destination database with `pg_restore -d <destination-connection-string> sepex.dump`. A dump captures one point in time; stop writes before the final export.
+2. Export files. Get `SepexArtifactsBucket` from the stack outputs, then run `aws s3 sync s3://<bucket-name> ./sepex-artifacts/`. This copies **current versions only**; export older versions separately if you need the full version history. Check that your local copy is complete.
+3. Export local API data and plugins from `/opt/sepex/data` if needed. Run `enable-ssh.sh` and configure SSH as instructed above, then `ssh "${SEPEX_STACK:-SepexStack}" 'sudo tar -C /opt/sepex/data -czf - .' > sepex-data.tar.gz`. Check the archive with `tar tzf sepex-data.tar.gz`. Preserve your process YAML and job configuration outside the stack.
+4. Delete each job stack before the SEPEX stack:
+
 ```sh
 bash deployment/scripts/destroy.sh SepexStack-pyecho-cloud   # each job stack first
 bash deployment/scripts/destroy.sh                           # then the SEPEX stack
 ```
 
-- Delete job stacks first, because they use the SEPEX VPC.
-- The RDS database and S3 bucket are retained. `destroy.sh` lists them at the end.
-  - To delete the database, turn off its deletion protection, then delete it.
-  - To delete the bucket, empty all object versions, then delete it.
-- The CDK bootstrap stack (`CDKToolkit`) is shared by all CDK apps in the account, so it is left in place.
+- `destroy.sh` warns about permanent data loss and asks for confirmation. `--yes` bypasses confirmation; only use it after completing exports.
+- The database, its backups, the bucket and all object versions, the API instance disk, and SEPEX-owned networking are deleted. The script also deletes the S3 cleanup Lambda's service-generated log group; the caller needs `logs:DescribeLogGroups` and `logs:DeleteLogGroup`. When reusing a VPC, the pre-existing VPC, NAT gateway, and pre-existing subnets/routes stay intact.
+- Backups or snapshots you create outside this stack are not deleted. Older deployments that retained resources require separate cleanup.
+- The CDK bootstrap stack (`CDKToolkit`) and externally managed Batch log group (`/aws/batch/job`) are shared resources, so they are left in place.
 
 ## Configuration reference
 

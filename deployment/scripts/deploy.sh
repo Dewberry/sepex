@@ -20,6 +20,16 @@ parse_args "$@"
 }
 require_commands aws
 resolve_region
+if [[ -n ${SEPEX_VPC_ID:-} ]]; then
+	[[ -n ${SEPEX_PRIVATE_SUBNET_CIDRS:-} && -n ${SEPEX_NAT_GATEWAY_ID:-} ]] ||
+		die 'Set SEPEX_PRIVATE_SUBNET_CIDRS and SEPEX_NAT_GATEWAY_ID with SEPEX_VPC_ID.'
+	nat_details=$(aws ec2 describe-nat-gateways --nat-gateway-ids "$SEPEX_NAT_GATEWAY_ID" \
+		--query 'NatGateways[0].[VpcId,ConnectivityType,State]' --output text) ||
+		die "Could not inspect NAT gateway $SEPEX_NAT_GATEWAY_ID."
+	read -r nat_vpc nat_connectivity nat_state <<<"$nat_details"
+	[[ $nat_vpc == "$SEPEX_VPC_ID" && $nat_connectivity == public && $nat_state == available ]] ||
+		die "NAT gateway $SEPEX_NAT_GATEWAY_ID must be an available public NAT gateway in $SEPEX_VPC_ID."
+fi
 
 stack_has_api_image_parameter() {
 	[[ $(aws cloudformation describe-stacks --stack-name "$SEPEX_STACK" \

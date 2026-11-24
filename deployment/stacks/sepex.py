@@ -1,3 +1,5 @@
+from ipaddress import IPv4Network, ip_network
+
 from aws_cdk import (
     CfnOutput,
     CfnParameter,
@@ -23,6 +25,7 @@ from stacks.shared import (
     AZ_COUNT,
     DEPLOYMENT_DIR,
     DIGEST_IMAGE_PATTERN,
+    grant_account_bucket_read,
     parameter_name,
 )
 
@@ -44,6 +47,8 @@ class SepexStack(Stack):
         construct_id: str,
         *,
         existing_vpc_id: str | None = None,
+        private_subnet_cidrs: str | None = None,
+        nat_gateway_id: str | None = None,
         env: Environment | None = None,
     ) -> None:
         super().__init__(scope, construct_id, env=env)
@@ -57,9 +62,83 @@ class SepexStack(Stack):
         )
 
         # Reuse a supplied VPC, or create the default network including its NAT gateway.
+        created_subnets: list[aws_ec2.Subnet] = []
         if existing_vpc_id:
             vpc = aws_ec2.Vpc.from_lookup(self, "Vpc", vpc_id=existing_vpc_id)
+            if not private_subnet_cidrs or not nat_gateway_id:
+                raise ValueError(
+                    "SEPEX_VPC_ID requires SEPEX_PRIVATE_SUBNET_CIDRS (two comma-separated CIDRs) "
+                    "and SEPEX_NAT_GATEWAY_ID (an existing public NAT gateway in that VPC)"
+                )
+            cidrs = [cidr.strip() for cidr in private_subnet_cidrs.split(",")]
+            if len(cidrs) != AZ_COUNT:
+                raise ValueError(
+                    f"SEPEX_PRIVATE_SUBNET_CIDRS must contain {AZ_COUNT} CIDRs"
+                )
+            networks = [ip_network(cidr, strict=True) for cidr in cidrs]
+            vpc_network = ip_network(vpc.vpc_cidr_block)
+            if not isinstance(vpc_network, IPv4Network) or any(
+                not isinstance(network, IPv4Network)
+                or not network.subnet_of(vpc_network)
+                or network.prefixlen > 28
+                for network in networks
+            ):
+                raise ValueError(
+                    "Subnet CIDRs must be IPv4 /28 or larger within the VPC CIDR"
+                )
+            if networks[0].overlaps(networks[1]):
+                raise ValueError("SEPEX_PRIVATE_SUBNET_CIDRS must not overlap")
+            if len(vpc.availability_zones) < AZ_COUNT:
+                raise ValueError(
+                    f"VPC must have at least {AZ_COUNT} availability zones"
+                )
+            existing_subnets = (
+                *vpc.public_subnets,
+                *vpc.private_subnets,
+                *vpc.isolated_subnets,
+            )
+            if any(
+                network.overlaps(ip_network(subnet.ipv4_cidr_block))
+                for network in networks
+                for subnet in existing_subnets
+            ):
+                raise ValueError(
+                    "SEPEX_PRIVATE_SUBNET_CIDRS overlap existing VPC subnets"
+                )
+            created_subnets = [
+                aws_ec2.Subnet(
+                    self,
+                    f"ApiSubnet{index + 1}",
+                    vpc_id=vpc.vpc_id,
+                    availability_zone=vpc.availability_zones[index],
+                    cidr_block=str(network),
+                    map_public_ip_on_launch=False,
+                )
+                for index, network in enumerate(networks)
+            ]
+            for subnet in created_subnets:
+                subnet.add_default_nat_route(nat_gateway_id)
+            vpc = aws_ec2.Vpc.from_vpc_attributes(
+                self,
+                "WorkloadVpc",
+                vpc_id=vpc.vpc_id,
+                vpc_cidr_block=vpc.vpc_cidr_block,
+                availability_zones=[
+                    subnet.availability_zone for subnet in created_subnets
+                ],
+                private_subnet_ids=[subnet.subnet_id for subnet in created_subnets],
+                private_subnet_route_table_ids=[
+                    subnet.route_table.route_table_id for subnet in created_subnets
+                ],
+            )
+            selected_private_subnet_ids = [
+                subnet.subnet_id for subnet in created_subnets
+            ]
         else:
+            if private_subnet_cidrs or nat_gateway_id:
+                raise ValueError(
+                    "SEPEX_PRIVATE_SUBNET_CIDRS and SEPEX_NAT_GATEWAY_ID require SEPEX_VPC_ID"
+                )
             vpc = aws_ec2.Vpc(
                 self,
                 "Vpc",
@@ -86,18 +165,14 @@ class SepexStack(Stack):
             vpc.add_gateway_endpoint(
                 "S3Endpoint", service=aws_ec2.GatewayVpcEndpointAwsService.S3
             )
+            selected_private_subnet_ids = vpc.select_subnets(
+                subnet_type=aws_ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                one_per_az=True,
+            ).subnet_ids
         private_subnets = aws_ec2.SubnetSelection(
             subnet_type=aws_ec2.SubnetType.PRIVATE_WITH_EGRESS,
             one_per_az=True,
         )
-        selected_private_subnets = vpc.select_subnets(
-            subnet_type=aws_ec2.SubnetType.PRIVATE_WITH_EGRESS,
-            one_per_az=True,
-        )
-        if len(selected_private_subnets.subnet_ids) < AZ_COUNT:
-            raise ValueError(
-                f"VPC must have private-with-egress subnets in at least {AZ_COUNT} AZs"
-            )
         database_subnets = aws_ec2.SubnetSelection(
             subnet_type=(
                 aws_ec2.SubnetType.PRIVATE_WITH_EGRESS
@@ -132,14 +207,14 @@ class SepexStack(Stack):
             # Protect database contents and keep the database if this stack is deleted.
             storage_encrypted=True,
             backup_retention=Duration.days(7),
-            deletion_protection=True,
-            removal_policy=RemovalPolicy.RETAIN,
+            deletion_protection=False,
+            removal_policy=RemovalPolicy.DESTROY,
             publicly_accessible=False,
         )
         if db.secret is None:
             raise ValueError("Database credentials must be stored in Secrets Manager")
 
-        # Store job files privately and encrypted; keep old versions and the bucket on deletion.
+        # Store job files privately and encrypted; delete all versions on stack deletion.
         bucket = aws_s3.Bucket(
             self,
             "Artifacts",
@@ -147,7 +222,8 @@ class SepexStack(Stack):
             enforce_ssl=True,
             encryption=aws_s3.BucketEncryption.S3_MANAGED,
             versioned=True,
-            removal_policy=RemovalPolicy.RETAIN,
+            removal_policy=RemovalPolicy.DESTROY,
+            auto_delete_objects=True,
         )
 
         # SSM parameters let scripts and job stacks find this stack's resources by name.
@@ -162,7 +238,7 @@ class SepexStack(Stack):
             (
                 "PrivateSubnetIdsParameter",
                 "private-subnet-ids",
-                Fn.join(",", selected_private_subnets.subnet_ids[:AZ_COUNT]),
+                Fn.join(",", selected_private_subnet_ids[:AZ_COUNT]),
             ),
         ):
             aws_ssm.StringParameter(
@@ -187,6 +263,13 @@ class SepexStack(Stack):
             )
         )
         bucket.grant_read_write(role)
+        role.add_to_policy(
+            aws_iam.PolicyStatement(
+                actions=["s3:ListAllMyBuckets"],
+                resources=["*"],
+            )
+        )
+        grant_account_bucket_read(role, self.account, self.partition)
         db.secret.grant_read(role)
         image_parameter.grant_read(role)
         aws_logs.LogGroup.from_log_group_name(
@@ -247,6 +330,8 @@ class SepexStack(Stack):
                 )
             ],
         )
+        for subnet in created_subnets:
+            instance.node.add_dependency(subnet.node.find_child("DefaultRoute"))
         # start-api.sh reads these on every (re)start; the image and password are fetched at runtime.
         api_config = {
             "SEPEX_REGION": self.region,

@@ -13,11 +13,17 @@ from stacks.shared import DIGEST_IMAGE_PATTERN
 DIGEST = "a" * 64
 
 
-def synthesize(existing_vpc_id: str | None = None) -> dict[str, Any]:
+def synthesize(
+    existing_vpc_id: str | None = None,
+    private_subnet_cidrs: str | None = None,
+    nat_gateway_id: str | None = None,
+) -> dict[str, Any]:
     stack = SepexStack(
         cdk.App(),
         "TestStack",
         existing_vpc_id=existing_vpc_id,
+        private_subnet_cidrs=private_subnet_cidrs,
+        nat_gateway_id=nat_gateway_id,
         env=cdk.Environment(account="123456789012", region="us-east-1"),
     )
     return dict(Template.from_stack(stack).to_json())
@@ -44,6 +50,16 @@ def actions(statement: dict) -> list[str]:
     return [action] if isinstance(action, str) else action
 
 
+def import_vpc(scope: Any, construct_id: str, *, vpc_id: str) -> aws_ec2.IVpc:
+    return aws_ec2.Vpc.from_vpc_attributes(
+        scope,
+        construct_id,
+        vpc_id=vpc_id,
+        vpc_cidr_block="172.31.0.0/16",
+        availability_zones=["us-east-1a", "us-east-1b"],
+    )
+
+
 class SepexStackTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -54,15 +70,19 @@ class SepexStackTest(unittest.TestCase):
             ]
         )
 
-    def test_private_database_and_retained_artifacts(self) -> None:
+    def test_private_database_and_deletable_artifacts(self) -> None:
         database = resources_of(self.template, "AWS::RDS::DBInstance")[0]
         self.assertFalse(database["Properties"]["PubliclyAccessible"])
         self.assertTrue(database["Properties"]["StorageEncrypted"])
-        self.assertTrue(database["Properties"]["DeletionProtection"])
+        self.assertFalse(database["Properties"]["DeletionProtection"])
         self.assertEqual(database["Properties"]["DBInstanceClass"], "db.t4g.micro")
-        self.assertEqual(database["DeletionPolicy"], "Retain")
+        self.assertEqual(database["DeletionPolicy"], "Delete")
         bucket = resources_of(self.template, "AWS::S3::Bucket")[0]
-        self.assertEqual(bucket["DeletionPolicy"], "Retain")
+        self.assertEqual(bucket["DeletionPolicy"], "Delete")
+        self.assertEqual(
+            bucket["Properties"]["VersioningConfiguration"]["Status"], "Enabled"
+        )
+        self.assertTrue(resources_of(self.template, "Custom::S3AutoDeleteObjects"))
         self.assertTrue(
             bucket["Properties"]["PublicAccessBlockConfiguration"]["BlockPublicAcls"]
         )
@@ -71,23 +91,13 @@ class SepexStackTest(unittest.TestCase):
         subnet_group = resources_of(self.template, "AWS::RDS::DBSubnetGroup")[0]
         self.assertEqual(len(subnet_group["Properties"]["SubnetIds"]), 2)
 
-    def test_existing_vpc_is_reused_without_creating_network_resources(self) -> None:
-        def import_vpc(scope: Any, construct_id: str, *, vpc_id: str) -> aws_ec2.IVpc:
-            return aws_ec2.Vpc.from_vpc_attributes(
-                scope,
-                construct_id,
-                vpc_id=vpc_id,
-                availability_zones=[
-                    cdk.Fn.select(index, cdk.Fn.get_azs()) for index in range(2)
-                ],
-                private_subnet_ids=[
-                    "subnet-0123456789abcdef0",
-                    "subnet-0123456789abcdef1",
-                ],
-            )
-
+    def test_existing_vpc_owns_only_new_subnets_and_routes(self) -> None:
         with patch("stacks.sepex.aws_ec2.Vpc.from_lookup", side_effect=import_vpc):
-            template = synthesize("vpc-0123456789abcdef0")
+            template = synthesize(
+                "vpc-0123456789abcdef0",
+                "172.31.0.0/24,172.31.1.0/24",
+                "nat-0123456789abcdef0",
+            )
 
         for resource_type in (
             "AWS::EC2::VPC",
@@ -95,11 +105,49 @@ class SepexStackTest(unittest.TestCase):
             "AWS::EC2::VPCEndpoint",
         ):
             self.assertEqual(resources_of(template, resource_type), [])
-        subnet_group = resources_of(template, "AWS::RDS::DBSubnetGroup")[0]
+        subnets = resources_of(template, "AWS::EC2::Subnet")
+        self.assertEqual(len(subnets), 2)
         self.assertEqual(
-            subnet_group["Properties"]["SubnetIds"],
-            ["subnet-0123456789abcdef0", "subnet-0123456789abcdef1"],
+            {subnet["Properties"]["CidrBlock"] for subnet in subnets},
+            {"172.31.0.0/24", "172.31.1.0/24"},
         )
+        self.assertTrue(
+            all(
+                subnet.get("DeletionPolicy", "Delete") == "Delete" for subnet in subnets
+            )
+        )
+        routes = resources_of(template, "AWS::EC2::Route")
+        self.assertEqual(len(routes), 2)
+        self.assertTrue(
+            all(
+                route["Properties"]["NatGatewayId"] == "nat-0123456789abcdef0"
+                for route in routes
+            )
+        )
+        instance = resources_of(template, "AWS::EC2::Instance")[0]
+        route_ids = {
+            logical_id
+            for logical_id, resource in template["Resources"].items()
+            if resource["Type"] == "AWS::EC2::Route"
+        }
+        self.assertTrue(route_ids.issubset(set(instance["DependsOn"])))
+        subnet_group = resources_of(template, "AWS::RDS::DBSubnetGroup")[0]
+        self.assertEqual(len(subnet_group["Properties"]["SubnetIds"]), 2)
+
+    def test_existing_vpc_requires_explicit_network_inputs(self) -> None:
+        with self.assertRaisesRegex(ValueError, "requires SEPEX_PRIVATE_SUBNET_CIDRS"):
+            synthesize("vpc-0123456789abcdef0")
+        with patch("stacks.sepex.aws_ec2.Vpc.from_lookup", side_effect=import_vpc):
+            for cidrs, error in (
+                ("172.31.0.0/24", "must contain 2 CIDRs"),
+                ("172.31.0.0/24,172.31.0.0/25", "must not overlap"),
+                ("172.32.0.0/24,172.31.1.0/24", "within the VPC CIDR"),
+            ):
+                with (
+                    self.subTest(cidrs=cidrs),
+                    self.assertRaisesRegex(ValueError, error),
+                ):
+                    synthesize("vpc-0123456789abcdef0", cidrs, "nat-0123456789abcdef0")
 
     def test_instance_requires_imdsv2(self) -> None:
         instance = resources_of(self.template, "AWS::EC2::Instance")[0]
@@ -149,6 +197,35 @@ class SepexStackTest(unittest.TestCase):
                 for statement in policy_statements(self.template)
             )
         )
+
+    def test_api_can_list_and_read_account_buckets(self) -> None:
+        statements = policy_statements(self.template)
+        list_buckets = next(
+            statement
+            for statement in statements
+            if "s3:ListAllMyBuckets" in actions(statement)
+        )
+        bucket_read = next(
+            statement
+            for statement in statements
+            if "s3:ListBucket" in actions(statement)
+        )
+        object_read = next(
+            statement
+            for statement in statements
+            if "s3:GetObject" in actions(statement)
+        )
+
+        self.assertEqual(list_buckets["Resource"], "*")
+        for statement, resource in (
+            (bucket_read, "s3:::*"),
+            (object_read, "s3:::*/*"),
+        ):
+            self.assertIn(resource, str(statement["Resource"]))
+            self.assertEqual(
+                statement["Condition"],
+                {"StringEquals": {"s3:ResourceAccount": "123456789012"}},
+            )
 
     def test_batch_permissions_are_scoped(self) -> None:
         by_action = {
